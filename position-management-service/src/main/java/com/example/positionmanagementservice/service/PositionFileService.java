@@ -264,6 +264,11 @@ public class PositionFileService {
     public void deleteById(UUID id) {
         PositionFile file = getById(id);
 
+        // Check if a Position File is locked meaning used in an execution then do not allow the deletion
+        if (file.isLocked()) {
+            throw new IllegalStateException("Cannot delete a position file that is locked (used in model execution).");
+        }
+
         // Delete dependent data first
         List<Loan> loans = loanRepository.findAllByPositionFile(file);
         for (Loan loan : loans) {

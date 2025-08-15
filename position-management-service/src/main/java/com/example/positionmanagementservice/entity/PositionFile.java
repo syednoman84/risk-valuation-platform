@@ -25,5 +25,8 @@ public class PositionFile {
     private String originalFilePath;
 
     private LocalDateTime uploadedAt;
+
+    @Column(nullable = false)
+    private boolean locked = false;
 }
 
