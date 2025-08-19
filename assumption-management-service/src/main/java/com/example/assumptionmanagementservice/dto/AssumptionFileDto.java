@@ -6,11 +6,11 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Data
-public class AssumptionValueDto {
+public class AssumptionFileDto {
     private UUID id;
     private String key;
-    private String value;
-    private LocalDateTime createdAt;
+    private String originalFileName;
+    private String filePath;
+    private LocalDateTime uploadedAt;
 }
-
 

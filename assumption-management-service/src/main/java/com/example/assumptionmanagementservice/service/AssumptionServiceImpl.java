@@ -1,5 +1,6 @@
 package com.example.assumptionmanagementservice.service;
 
+import com.example.assumptionmanagementservice.dto.AssumptionFileDto;
 import com.example.assumptionmanagementservice.dto.AssumptionSetDto;
 import com.example.assumptionmanagementservice.dto.AssumptionValueDto;
 import com.example.assumptionmanagementservice.entity.AssumptionFile;
@@ -45,7 +46,7 @@ public class AssumptionServiceImpl implements AssumptionService {
             throw new IllegalArgumentException("Assumption set with name '" + name + "' already exists.");
         }
 
-        // Saving Assumption Set
+        // Save Assumption Set
         AssumptionSet set = new AssumptionSet();
         set.setName(name);
         set.setDescription(description);
@@ -53,15 +54,24 @@ public class AssumptionServiceImpl implements AssumptionService {
         set.setUpdatedAt(LocalDateTime.now());
         set = setRepository.save(set);
 
-
+        // Save key-values (excluding reserved ones)
         for (Map.Entry<String, String> entry : keyValues.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue();
+
+            if (key.equalsIgnoreCase("name") || key.equalsIgnoreCase("description")) {
+                log.warn("Skipping reserved key '{}' during assumption set creation.", key);
+                continue;
+            }
+
             AssumptionValue val = new AssumptionValue();
             val.setAssumptionSet(set);
-            val.setKey(entry.getKey());
-            val.setValue(entry.getValue());
+            val.setKey(key);
+            val.setValue(value);
             valueRepository.save(val);
         }
 
+        // Save associated CSV files
         for (Map.Entry<String, MultipartFile> entry : csvFiles.entrySet()) {
             String key = entry.getKey();
             MultipartFile file = entry.getValue();
@@ -81,18 +91,63 @@ public class AssumptionServiceImpl implements AssumptionService {
     }
 
     @Override
+    public List<AssumptionSetDto> getAllDtos() {
+        List<AssumptionSet> sets = assumptionSetRepository.findAll();
+
+        return sets.stream()
+                .map(set -> {
+                    AssumptionSetDto dto = new AssumptionSetDto();
+                    dto.setId(set.getId());
+                    dto.setName(set.getName());
+                    dto.setDescription(set.getDescription());
+                    dto.setLocked(set.isLocked());
+                    dto.setCreatedAt(set.getCreatedAt());
+                    dto.setUpdatedAt(set.getUpdatedAt());
+
+                    // Map key-values
+                    List<AssumptionValueDto> kvDtos = Optional.ofNullable(set.getKeyValues())
+                            .orElse(Collections.emptySet())
+                            .stream()
+                            .map(value -> {
+                                AssumptionValueDto v = new AssumptionValueDto();
+                                v.setId(value.getId());
+                                v.setKey(value.getKey());
+                                v.setValue(value.getValue());
+                                v.setCreatedAt(value.getCreatedAt());
+                                return v;
+                            }).collect(Collectors.toList());
+
+                    dto.setTextBasedAssumptions(kvDtos);
+
+                    // Map files
+                    List<AssumptionFileDto> fileDtos = Optional.ofNullable(set.getFiles())
+                            .orElse(Collections.emptySet())
+                            .stream()
+                            .map(file -> {
+                                AssumptionFileDto f = new AssumptionFileDto();
+                                f.setId(file.getId());
+                                f.setKey(file.getKey());
+                                f.setOriginalFileName(file.getOriginalFileName());
+                                f.setFilePath(file.getFilePath());
+                                f.setUploadedAt(file.getUploadedAt());
+                                return f;
+                            }).collect(Collectors.toList());
+
+                    dto.setFileBasedAssumptions(fileDtos);
+
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public AssumptionSet getById(UUID id) {
         return setRepository.findById(id).orElseThrow(() -> new NoSuchElementException("Assumption set not found"));
     }
 
     @Override
-    public List<AssumptionSet> getAll() {
-        return setRepository.findAll();
-    }
-
-    @Override
     public AssumptionSetDto getDtoById(UUID id) {
-        AssumptionSet set = assumptionSetRepository.findWithValuesById(id)
+        AssumptionSet set = assumptionSetRepository.findWithValuesAndFilesById(id)
                 .orElseThrow(() -> new NoSuchElementException("Assumption Set not found"));
 
         AssumptionSetDto dto = new AssumptionSetDto();
@@ -100,23 +155,42 @@ public class AssumptionServiceImpl implements AssumptionService {
         dto.setName(set.getName());
         dto.setDescription(set.getDescription());
         dto.setLocked(set.isLocked());
+        dto.setCreatedAt(set.getCreatedAt());
+        dto.setUpdatedAt(set.getUpdatedAt());
 
+        // Key-values
         List<AssumptionValueDto> kvDtos = Optional.ofNullable(set.getKeyValues())
-                .orElse(Collections.emptyList())
+                .orElse(Collections.emptySet())
                 .stream()
                 .map(value -> {
                     AssumptionValueDto v = new AssumptionValueDto();
+                    v.setId(value.getId());
                     v.setKey(value.getKey());
                     v.setValue(value.getValue());
+                    v.setCreatedAt(value.getCreatedAt());
                     return v;
                 }).collect(Collectors.toList());
 
-        dto.setKeyValues(kvDtos);
+        dto.setTextBasedAssumptions(kvDtos);
 
+        // Files
+        List<AssumptionFileDto> fileDtos = Optional.ofNullable(set.getFiles())
+                .orElse(Collections.emptySet())
+                .stream()
+                .map(file -> {
+                    AssumptionFileDto f = new AssumptionFileDto();
+                    f.setId(file.getId());
+                    f.setKey(file.getKey());
+                    f.setOriginalFileName(file.getOriginalFileName());
+                    f.setFilePath(file.getFilePath());
+                    f.setUploadedAt(file.getUploadedAt());
+                    return f;
+                }).collect(Collectors.toList());
+
+        dto.setFileBasedAssumptions(fileDtos);
 
         return dto;
     }
-
 
     @Override
     @Transactional

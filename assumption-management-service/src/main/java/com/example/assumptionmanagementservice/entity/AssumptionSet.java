@@ -1,12 +1,11 @@
 package com.example.assumptionmanagementservice.entity;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Entity
 @Table(name = "assumption_set")
@@ -26,8 +25,12 @@ public class AssumptionSet {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "assumptionSet", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<AssumptionValue> keyValues = new ArrayList<>();
+    @OneToMany(mappedBy = "assumptionSet", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @JsonManagedReference
+    private Set<AssumptionFile> files = new HashSet<>();
 
+    @OneToMany(mappedBy = "assumptionSet", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @JsonManagedReference
+    private Set<AssumptionValue> keyValues = new HashSet<>();
 }
 

@@ -2,6 +2,7 @@ package com.example.assumptionmanagementservice.dto;
 
 import lombok.Data;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -11,7 +12,10 @@ public class AssumptionSetDto {
     private String name;
     private String description;
     private boolean locked;
-    private List<AssumptionValueDto> keyValues;
+    private List<AssumptionValueDto> textBasedAssumptions;
+    private List<AssumptionFileDto> fileBasedAssumptions;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }
 
 

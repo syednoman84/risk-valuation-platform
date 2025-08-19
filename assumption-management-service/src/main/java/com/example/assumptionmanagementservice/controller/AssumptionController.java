@@ -36,9 +36,10 @@ public class AssumptionController {
     }
 
     @GetMapping
-    public List<AssumptionSet> getAll() {
-        return assumptionService.getAll();
+    public ResponseEntity<List<AssumptionSetDto>> getAll() {
+        return ResponseEntity.ok(assumptionService.getAllDtos());
     }
+
 
     @GetMapping("/{id}")
     public ResponseEntity<AssumptionSetDto> getById(@PathVariable UUID id) {
