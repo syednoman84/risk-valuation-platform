@@ -15,4 +15,6 @@ public interface RateScheduleRepository extends JpaRepository<RateSchedule, UUID
     @Transactional
     @Query("DELETE FROM RateSchedule rs WHERE rs.loan = :loan")
     void deleteAllByLoan(@Param("loan") Loan loan);
+
+    long countByLoan_PositionFile_Id(UUID positionFileId);
 }

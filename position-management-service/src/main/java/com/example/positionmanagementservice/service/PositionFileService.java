@@ -1,5 +1,6 @@
 package com.example.positionmanagementservice.service;
 
+import com.example.positionmanagementservice.dto.PositionFileMetaDTO;
 import com.example.positionmanagementservice.entity.*;
 import com.example.positionmanagementservice.repository.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -289,5 +290,55 @@ public class PositionFileService {
         }
     }
 
+    public boolean exists(UUID id) {
+        return positionFileRepository.existsById(id);
+    }
+
+    public long getLoanCount(UUID positionFileId) {
+        ensureExists(positionFileId);
+        return loanRepository.countByPositionFile_Id(positionFileId);
+    }
+
+    public long getPaymentScheduleCount(UUID positionFileId) {
+        ensureExists(positionFileId);
+        return paymentScheduleRepository.countByLoan_PositionFile_Id(positionFileId);
+    }
+
+    public long getRateScheduleCount(UUID positionFileId) {
+        ensureExists(positionFileId);
+        return rateScheduleRepository.countByLoan_PositionFile_Id(positionFileId);
+    }
+
+    public long getCustomFieldCount(UUID positionFileId) {
+        ensureExists(positionFileId);
+        return customFieldRepository.countByLoan_PositionFile_Id(positionFileId);
+    }
+
+    public long getCustomFieldLoanCount(UUID positionFileId) {
+        ensureExists(positionFileId);
+        return customFieldRepository.countDistinctLoansInCustomFields(positionFileId);
+    }
+
+    public PositionFileMetaDTO getMetadata(UUID positionFileId) {
+        PositionFile pf = positionFileRepository.findById(positionFileId)
+                .orElseThrow(() -> new NoSuchElementException("Position file not found: " + positionFileId));
+
+        long loans = loanRepository.countByPositionFile_Id(positionFileId);
+        long schedules = paymentScheduleRepository.countByLoan_PositionFile_Id(positionFileId);
+        long rateRows = rateScheduleRepository.countByLoan_PositionFile_Id(positionFileId);
+        long customFields = customFieldRepository.countByLoan_PositionFile_Id(positionFileId);
+
+        return new PositionFileMetaDTO(
+                pf.getId(),
+                pf.getName(),
+                pf.getZipFileName(),
+                pf.getOriginalFilePath(),
+                loans, schedules, rateRows, customFields
+        );
+    }
+
+    private void ensureExists(UUID id) {
+        if (!exists(id)) throw new NoSuchElementException("Position file not found: " + id);
+    }
 }
 

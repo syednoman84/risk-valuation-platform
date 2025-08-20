@@ -7,7 +7,9 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -50,4 +52,21 @@ public class LoanModelServiceImpl implements LoanModelService {
     public Optional<LoanModel> getLatestActiveModel(String name) {
         return repository.findFirstByNameAndActiveTrueOrderByVersionDesc(name);
     }
+
+    public LoanModel getByIdAndVersion(UUID modelId, int version) {
+        return repository.findByIdAndVersion(modelId, version)
+                .orElseThrow(() -> new NoSuchElementException("Model not found for id=" + modelId + " v=" + version));
+    }
+
+    public boolean existsByIdAndVersion(UUID modelId, int version) {
+        return repository.findByIdAndVersion(modelId, version).isPresent();
+    }
+
+    public boolean existsById(UUID id) { return repository.existsById(id); }
+
+    public LoanModel getById(UUID id) {
+        return repository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Model not found: " + id));
+    }
+
 }

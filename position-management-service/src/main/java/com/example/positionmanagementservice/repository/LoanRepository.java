@@ -10,5 +10,5 @@ import java.util.UUID;
 public interface LoanRepository extends JpaRepository<Loan, UUID> {
 
     List<Loan> findAllByPositionFile(PositionFile positionFile);
-
+    long countByPositionFile_Id(UUID positionFileId);
 }

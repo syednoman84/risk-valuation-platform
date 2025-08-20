@@ -1,5 +1,6 @@
 package com.example.positionmanagementservice.controller;
 
+import com.example.positionmanagementservice.dto.PositionFileMetaDTO;
 import com.example.positionmanagementservice.entity.PositionFile;
 import com.example.positionmanagementservice.service.PositionFileService;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -65,6 +67,48 @@ public class PositionFileController {
         return ResponseEntity.ok("Position file deleted.");
     }
 
+    // HEAD /api/position-files/{id}
+    @RequestMapping(path = "/{id}", method = RequestMethod.HEAD)
+    public ResponseEntity<Void> head(@PathVariable UUID id) {
+        return positionFileService.exists(id) ? ResponseEntity.ok().build()
+                : ResponseEntity.notFound().build();
+    }
+
+    // GET /api/position-files/{id}/loans/count
+    @GetMapping("/{id}/loans/count")
+    public Map<String, Long> getLoanCount(@PathVariable UUID id) {
+        return Map.of("count", positionFileService.getLoanCount(id));
+    }
+
+    // (Optional) GET /api/position-files/{id}/payment-schedules/count
+    @GetMapping("/{id}/payment-schedules/count")
+    public Map<String, Long> getPaymentScheduleCount(@PathVariable UUID id) {
+        return Map.of("count", positionFileService.getPaymentScheduleCount(id));
+    }
+
+    // (Optional) GET /api/position-files/{id}/rate-schedules/count
+    @GetMapping("/{id}/rate-schedules/count")
+    public Map<String, Long> getRateScheduleCount(@PathVariable UUID id) {
+        return Map.of("count", positionFileService.getRateScheduleCount(id));
+    }
+
+    // (Optional) GET /api/position-files/{id}/custom-fields/count
+    @GetMapping("/{id}/custom-fields/count")
+    public Map<String, Long> getCustomFieldCount(@PathVariable UUID id) {
+        return Map.of("count", positionFileService.getCustomFieldCount(id));
+    }
+
+    // Distinct loans that have any custom fields
+    @GetMapping("/{id}/custom-fields/loans/count")
+    public Map<String, Long> getCustomFieldLoanCount(@PathVariable UUID id) {
+        return Map.of("count", positionFileService.getCustomFieldLoanCount(id));
+    }
+
+    // (Optional) GET /api/position-files/{id}/metadata
+    @GetMapping("/{id}/metadata")
+    public PositionFileMetaDTO getMetadata(@PathVariable UUID id) {
+        return positionFileService.getMetadata(id);
+    }
 
 }
 

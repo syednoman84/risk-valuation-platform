@@ -16,4 +16,12 @@ public interface CustomFieldRepository extends JpaRepository<CustomField, UUID> 
     @Transactional
     @Query("DELETE FROM CustomField cf WHERE cf.loan = :loan")
     void deleteAllByLoan(@Param("loan") Loan loan);
+
+    long countByLoan_PositionFile_Id(UUID positionFileId);
+
+    // Distinct loan count (how many loans have any custom field)
+    @Query("select count(distinct cf.loan.id) " +
+            "from CustomField cf " +
+            "where cf.loan.positionFile.id = :positionFileId")
+    long countDistinctLoansInCustomFields(@Param("positionFileId") UUID positionFileId);
 }

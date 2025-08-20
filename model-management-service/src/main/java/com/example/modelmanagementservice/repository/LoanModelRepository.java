@@ -14,5 +14,8 @@ public interface LoanModelRepository extends JpaRepository<LoanModel, UUID> {
     Optional<LoanModel> findByNameAndVersion(String name, int version);
 
     Optional<LoanModel> findFirstByNameAndActiveTrueOrderByVersionDesc(String name);
+
+    Optional<LoanModel> findByIdAndVersion(UUID id, Integer version);
+
 }
 

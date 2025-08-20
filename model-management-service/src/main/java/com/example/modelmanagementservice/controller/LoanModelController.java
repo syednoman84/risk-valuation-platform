@@ -1,6 +1,7 @@
 package com.example.modelmanagementservice.controller;
 
 import com.example.modelmanagementservice.dto.CreateModelRequest;
+import com.example.modelmanagementservice.dto.ModelDetailsDTO;
 import com.example.modelmanagementservice.entity.LoanModel;
 import com.example.modelmanagementservice.service.LoanModelService;
 import jakarta.validation.Valid;
@@ -9,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/models")
@@ -25,7 +27,7 @@ public class LoanModelController {
     }
 
 
-    @GetMapping("/{name}")
+    @GetMapping("/by-name/{name}")
     public ResponseEntity<List<LoanModel>> getAllVersions(@PathVariable String name) {
         return ResponseEntity.ok(service.getAllVersions(name));
     }
@@ -45,5 +47,21 @@ public class LoanModelController {
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
+
+    // HEAD /models/{id}
+    @RequestMapping(path = "/{id:[0-9a-fA-F\\-]{36}}", method = RequestMethod.HEAD)
+    public ResponseEntity<Void> headById(@PathVariable UUID id) {
+        return service.existsById(id) ? ResponseEntity.ok().build()
+                : ResponseEntity.notFound().build();
+    }
+
+
+    // GET /api/models/{id}
+    @GetMapping(value = "/{id:[0-9a-fA-F\\-]{36}}", produces = "application/json")
+    public ModelDetailsDTO getById(@PathVariable UUID id) {
+        return ModelDetailsDTO.from(service.getById(id));
+    }
+
+
 }
 

@@ -16,4 +16,5 @@ public interface PaymentScheduleRepository extends JpaRepository<PaymentSchedule
     @Query("DELETE FROM PaymentSchedule ps WHERE ps.loan = :loan")
     void deleteAllByLoan(@Param("loan") Loan loan);
 
+    long countByLoan_PositionFile_Id(UUID positionFileId);
 }
