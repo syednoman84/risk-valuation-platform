@@ -13,6 +13,8 @@ import com.example.modelexecutionservice.repository.ModelExecutionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -29,26 +31,28 @@ public class ExecutionOrchestratorImpl implements ExecutionOrchestrator {
     private final AssumptionServiceClient assumptionClient;
     private final ModelServiceClient modelClient;
 
+    // NEW: worker to process chunks asynchronously
+    private final ChunkExecutionWorker chunkWorker;
+
     @Override
     @Transactional
     public ModelExecution start(CreateExecutionRequest req) {
         // 1) Validate upstream resources
 
-        // Fetch model by ROW id (id-only endpoint) and resolve version from the row
+        // Fetch model row and resolve version
         var model = modelClient.getById(req.modelId());
         int resolvedVersion = model.version();
 
-        // If caller sent a version, enforce it matches the row's version
         if (req.modelVersion() != null && !req.modelVersion().equals(resolvedVersion)) {
             throw new IllegalArgumentException(
                     "Model version mismatch: requested " + req.modelVersion()
                             + " but found " + resolvedVersion + " for modelId " + req.modelId());
         }
 
-        // Validate assumption set exists
+        // Validate assumption set
         assumptionClient.assertExists(req.assumptionSetId());
 
-        // Get total loans from Position service
+        // Get total loans
         long totalLoans = positionClient.getTotalLoans(req.positionFileId());
         if (totalLoans <= 0) {
             throw new IllegalArgumentException("Position file has zero loans");
@@ -73,7 +77,7 @@ public class ExecutionOrchestratorImpl implements ExecutionOrchestrator {
                 .updatedAt(LocalDateTime.now())
                 .build();
 
-        exec = executionRepo.saveAndFlush(exec); // generate UUID
+        exec = executionRepo.saveAndFlush(exec);
 
         // 3) Create chunks
         List<ModelExecutionChunk> chunks = new ArrayList<>(totalChunks);
@@ -93,15 +97,29 @@ public class ExecutionOrchestratorImpl implements ExecutionOrchestrator {
                     .createdAt(LocalDateTime.now())
                     .updatedAt(LocalDateTime.now())
                     .build();
-            chunks.add(chunk);
 
+            chunks.add(chunk);
             startOffset = endExclusive;
         }
-        chunkRepo.saveAll(chunks);
+        chunks = chunkRepo.saveAll(chunks);
 
-        // 4) Mark QUEUED (publishing happens in Step 3)
+        // 4) Mark QUEUED
         exec.setStatus(ExecutionStatus.QUEUED);
         exec = executionRepo.save(exec);
+
+        // 5) AFTER COMMIT: dispatch chunks asynchronously
+        final UUID executionId = exec.getId();
+        final List<UUID> chunkIds = chunks.stream().map(ModelExecutionChunk::getId).toList();
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                // Fire-and-forget; ChunkExecutionWorker.processChunk is @Async
+                for (UUID chunkId : chunkIds) {
+                    chunkWorker.processChunk(chunkId);
+                }
+            }
+        });
 
         return exec;
     }

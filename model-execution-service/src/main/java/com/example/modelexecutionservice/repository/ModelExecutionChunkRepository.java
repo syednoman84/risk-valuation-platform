@@ -2,6 +2,8 @@ package com.example.modelexecutionservice.repository;
 
 import com.example.modelexecutionservice.domain.ChunkStatus;
 import com.example.modelexecutionservice.entity.ModelExecutionChunk;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 
@@ -12,6 +14,6 @@ import java.util.UUID;
 
 public interface ModelExecutionChunkRepository extends JpaRepository<ModelExecutionChunk, UUID> {
     List<ModelExecutionChunk> findByExecutionId(UUID executionId);
-    List<ModelExecutionChunk> findByExecutionIdAndStatus(UUID executionId, ChunkStatus status);
-    Optional<ModelExecutionChunk> findByExecutionIdAndChunkIndex(UUID executionId, Integer chunkIndex);
+    // for the paginated controller endpoint
+    Page<ModelExecutionChunk> findByExecutionId(UUID executionId, Pageable pageable);
 }

@@ -1,10 +1,13 @@
 package com.example.modelexecutionservice.external;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Component
@@ -58,6 +61,43 @@ public class PositionServiceClient {
                 )
                 .toBodilessEntity()
                 .block();
+    }
+
+    /** Lightweight DTO used by the worker */
+    public record LoanRow(String loanId, Map<String, Object> fields) {}
+
+    /** Response DTO coming from the Position service; adjust to your actual payload. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    static class LoanRowResponse {
+        public String loanId;
+        public Map<String, Object> fields;
+    }
+
+    /** GET /api/positions/{id}/loans?offset=...&limit=... -> [ {loanId, fields{...}}, ... ] */
+    public List<LoanRow> getLoansSlice(UUID positionFileId, long offset, int limit) {
+        LoanRowResponse[] resp = client.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/positions/{id}/loans")
+                        .queryParam("offset", offset)
+                        .queryParam("limit", limit)
+                        .build(positionFileId))
+                .retrieve()
+                .onStatus(
+                        status -> status.is4xxClientError(),
+                        r -> Mono.error(new IllegalArgumentException("Invalid positionFileId or slice params"))
+                )
+                .onStatus(
+                        status -> status.is5xxServerError(),
+                        r -> Mono.error(new IllegalStateException("Position service unavailable"))
+                )
+                .bodyToMono(LoanRowResponse[].class)
+                .block();
+
+        if (resp == null) throw new IllegalStateException("Null loans slice from position service");
+
+        return java.util.Arrays.stream(resp)
+                .map(r -> new LoanRow(r.loanId, r.fields))
+                .toList();
     }
 }
 

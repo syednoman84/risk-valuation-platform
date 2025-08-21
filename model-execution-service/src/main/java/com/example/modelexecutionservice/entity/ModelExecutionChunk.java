@@ -60,6 +60,7 @@ public class ModelExecutionChunk {
 
     @Column(name = "idempotency_key", nullable = false, length = 128)
     private String idempotencyKey; // executionId + chunkIndex (and maybe checksum)
+
     @Column(name = "payload_checksum", length = 64)
     private String payloadChecksum; // optional integrity check
 
@@ -100,6 +101,8 @@ public class ModelExecutionChunk {
     @Column(name = "version", nullable = false)
     private Long version;
 
+    @Column(name = "error_summary")
+    private String errorSummary;
 
     @PrePersist
     void onCreate() {

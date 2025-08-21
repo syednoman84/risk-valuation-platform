@@ -7,5 +7,7 @@ public enum ChunkStatus {
     SUCCEEDED, // all loans in this chunk processed successfully
     FAILED, // exceeded retries / unrecoverable
     CANCELED, // cancel requested & honored
-    DEAD_LETTERED // routed to DLQ by broker
+    DEAD_LETTERED, // routed to DLQ by broker,
+    PARTIAL_SUCCESS,
+    COMPLETED
 }
