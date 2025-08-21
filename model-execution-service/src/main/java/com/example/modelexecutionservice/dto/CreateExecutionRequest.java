@@ -8,7 +8,7 @@ import java.util.UUID;
 
 public record CreateExecutionRequest(
         @NotNull UUID modelId,
-        @NotNull Integer modelVersion,
+        Integer modelVersion,
         @NotNull UUID positionFileId,
         @NotNull UUID assumptionSetId,
         @Min(1) Integer chunkSize,

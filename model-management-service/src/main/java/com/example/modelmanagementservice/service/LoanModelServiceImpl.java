@@ -69,4 +69,8 @@ public class LoanModelServiceImpl implements LoanModelService {
                 .orElseThrow(() -> new NoSuchElementException("Model not found: " + id));
     }
 
+    public List<LoanModel> getAll() {
+        return repository.findAll(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "updatedAt"));
+    }
+
 }

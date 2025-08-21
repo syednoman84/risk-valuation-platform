@@ -20,10 +20,16 @@ public class LoanModelController {
     private final LoanModelService service;
 
     @PostMapping
-    public ResponseEntity<LoanModel> create(@Valid @RequestBody CreateModelRequest request){        return ResponseEntity.ok(service.createModel(
+    public ResponseEntity<LoanModel> create(@Valid @RequestBody CreateModelRequest request) {
+        return ResponseEntity.ok(service.createModel(
                 request.getName(),
                 request.getDescription(),
                 request.getJsonDefinition()));
+    }
+
+    @GetMapping("/all")
+    public ResponseEntity<List<LoanModel>> getAll() {
+        return ResponseEntity.ok(service.getAll());
     }
 
 

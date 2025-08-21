@@ -20,7 +20,7 @@ public class PositionServiceClient {
         record CountResp(long count) {}
 
         CountResp resp = client.get()
-                .uri(uriBuilder -> uriBuilder.path("/position-files/{id}/loans/count")
+                .uri(uriBuilder -> uriBuilder.path("/api/positions/{id}/loans/count")
                         .build(positionFileId))
                 .retrieve()
                 .onStatus(
@@ -46,7 +46,7 @@ public class PositionServiceClient {
 
     public void assertExists(UUID positionFileId) {
         client.head()
-                .uri(uriBuilder -> uriBuilder.path("/position-files/{id}").build(positionFileId))
+                .uri(uriBuilder -> uriBuilder.path("/api/positions/{id}").build(positionFileId))
                 .retrieve()
                 .onStatus(
                         status -> status.is4xxClientError(),
