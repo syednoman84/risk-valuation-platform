@@ -24,7 +24,7 @@ public record ModelDetailsDTO(
                 m.getDescription(),
                 m.getCreatedAt(),
                 m.getUpdatedAt(),
-                m.getModelDefinition()
+                m.getModelDefinition().toString()
         );
     }
 }

@@ -1,5 +1,6 @@
 package com.example.positionmanagementservice.service;
 
+import com.example.positionmanagementservice.controller.PositionFileController;
 import com.example.positionmanagementservice.dto.PositionFileMetaDTO;
 import com.example.positionmanagementservice.entity.*;
 import com.example.positionmanagementservice.repository.*;
@@ -9,6 +10,9 @@ import lombok.RequiredArgsConstructor;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -23,7 +27,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
-import java.util.zip.ZipInputStream;
 
 @Service
 @RequiredArgsConstructor
@@ -33,7 +36,7 @@ public class PositionFileService {
     private final LoanRepository loanRepository;
     private final PaymentScheduleRepository paymentScheduleRepository;
     private final RateScheduleRepository rateScheduleRepository;
-    private final CustomFieldRepository customFieldRepository;
+    private final CustomFieldsRepository customFieldsRepository;
     private final FileStorageService fileStorageService;
 
     private final ObjectMapper objectMapper = new ObjectMapper(); // For jsonb handling
@@ -43,6 +46,7 @@ public class PositionFileService {
             "loanNumber", "principal", "interestRate", "termMonths", "amortizationType", "originationDate"
     );
 
+    @Transactional
     public void handleUpload(String name, LocalDate positionDate, MultipartFile zipFile) throws IOException {
 
         // Check uniqueness of name + date
@@ -103,8 +107,6 @@ public class PositionFileService {
             }
 
         } catch (Exception ex) {
-            // Cleanup on failure
-            positionFileRepository.delete(positionFile);
             throw new RuntimeException("Parsing failed: " + ex.getMessage(), ex);
         }
     }
@@ -147,142 +149,214 @@ public class PositionFileService {
 
 
     private void parseLoanCsv(List<CSVRecord> records, PositionFile positionFile) {
+        if (records == null || records.isEmpty()) return;
+
+        // Ensure we hold a managed reference in this method’s context
+        UUID fileId = positionFile.getId();
+        PositionFile pfRef = positionFileRepository.getReferenceById(fileId);
+
+        List<Loan> toSave = new ArrayList<>(records.size());
         for (CSVRecord row : records) {
             Loan loan = new Loan();
-            loan.setPositionFile(positionFile);
+            loan.setPositionFile(pfRef);
 
-            Map<String, Object> extra = new HashMap<>();
-
-            for (Map.Entry<String, String> entry : row.toMap().entrySet()) {
+            Map<String, String> map = row.toMap();
+            for (Map.Entry<String, String> entry : map.entrySet()) {
                 String column = entry.getKey();
                 String value = entry.getValue();
 
                 if (STANDARD_LOAN_COLUMNS.contains(column)) {
                     switch (column) {
-                        case "loanNumber" -> loan.setLoanNumber(value);
-                        case "principal" -> loan.setPrincipal(new BigDecimal(value));
-                        case "interestRate" -> loan.setInterestRate(new BigDecimal(value));
-                        case "termMonths" -> loan.setTermMonths(Integer.parseInt(value));
-                        case "amortizationType" -> loan.setAmortizationType(value);
-                        case "originationDate" -> loan.setOriginationDate(LocalDate.parse(value));
+                        case "loanNumber" -> loan.setLoanNumber(nz(value).trim());
+                        case "principal" -> loan.setPrincipal(safeDecimal(value));
+                        case "interestRate" -> loan.setInterestRate(safeDecimal(value));
+                        case "termMonths" -> loan.setTermMonths(parseIntSafe(value));
+                        case "amortizationType" -> loan.setAmortizationType(nz(value).trim());
+                        case "originationDate" -> loan.setOriginationDate(safeDate(value));
                     }
-                } else {
-                    extra.put(column, value);
                 }
             }
 
-            loan.setExtraFields(extra);
-            loanRepository.save(loan);
+            // minimal validation
+            if (isBlank(loan.getLoanNumber())) {
+                // skip bad row (or throw)
+                continue;
+            }
+
+            toSave.add(loan);
+        }
+
+        if (!toSave.isEmpty()) {
+            loanRepository.saveAll(toSave);
         }
     }
 
-    private void parsePaymentSchedule(List<CSVRecord> records, Map<String, Loan> loanMap) {
+    private void parsePaymentSchedule(
+            List<CSVRecord> records,
+            Map<String, Loan> loanMap // key = loanNumber, value = Loan (with positionFile set)
+    ) {
+        if (records == null || records.isEmpty()) return;
+
+        List<PaymentSchedule> toSave = new ArrayList<>(records.size());
+
         for (CSVRecord row : records) {
-            String loanNumber = row.get("loanNumber");
+            String loanNumber = trimToNull(firstNonBlank(row, "loanNumber", "loan_number"));
+            if (loanNumber == null) continue;
+
+            // Anchor to the loan from THIS file
             Loan loan = loanMap.get(loanNumber);
             if (loan == null) continue;
 
             PaymentSchedule ps = new PaymentSchedule();
-            ps.setLoan(loan);
+            ps.setLoanNumber(loanNumber);
+            ps.setPositionFile(loan.getPositionFile()); // parent FK
+            ps.setLoanRef(loan);                        // back-ref
 
-            Map<String, Object> extra = new HashMap<>();
-            for (Map.Entry<String, String> entry : row.toMap().entrySet()) {
-                String column = entry.getKey();
-                String value = entry.getValue();
+            String startDateStr = firstNonBlank(row, "startDate", "start_date");
+            if (isNotBlank(startDateStr)) ps.setStartDate(safeDate(startDateStr));
 
-                if (STANDARD_SCHEDULE_COLUMNS.contains(column)) {
-                    switch (column) {
-                        case "dueDate" -> ps.setDueDate(LocalDate.parse(value));
-                        case "principalDue" -> ps.setPrincipalDue(new BigDecimal(value));
-                        case "interestDue" -> ps.setInterestDue(new BigDecimal(value));
-                        case "paymentType" -> ps.setPaymentType(value);
-                    }
-                } else if (!column.equals("loanNumber")) {
-                    extra.put(column, value);
-                }
-            }
+            String endDateStr = firstNonBlank(row, "endDate", "end_date");
+            if (isNotBlank(endDateStr)) ps.setEndDate(safeDate(endDateStr));
 
-            ps.setExtraFields(extra);
-            paymentScheduleRepository.save(ps);
+            String monthlyPaymentStr = firstNonBlank(row, "monthlyPayment", "monthly_payment");
+            if (isNotBlank(monthlyPaymentStr)) ps.setMonthlyPayment(safeDecimal(monthlyPaymentStr));
+
+            String interestPaymentStr = firstNonBlank(row, "interestPayment", "interest_payment");
+            if (isNotBlank(interestPaymentStr)) ps.setInterestPayment(safeDecimal(interestPaymentStr));
+
+            String principalPaymentStr = firstNonBlank(row, "principalPayment", "principal_payment");
+            if (isNotBlank(principalPaymentStr)) ps.setPrincipalPayment(safeDecimal(principalPaymentStr));
+
+            String paymentType = firstNonBlank(row, "paymentType", "payment_type", "type");
+            if (isNotBlank(paymentType)) ps.setPaymentType(paymentType.trim());
+
+            toSave.add(ps);
+        }
+
+        if (!toSave.isEmpty()) {
+            paymentScheduleRepository.saveAll(toSave);
         }
     }
 
-    private void parseRateSchedule(List<CSVRecord> records, Map<String, Loan> loanMap) {
+    private void parseRateSchedule(
+            List<CSVRecord> records,
+            Map<String, Loan> loanMap
+    ) {
+        if (records == null || records.isEmpty()) return;
+
+        List<RateSchedule> toSave = new ArrayList<>(records.size());
+
         for (CSVRecord row : records) {
-            String loanNumber = row.get("loanNumber");
+            String loanNumber = trimToNull(firstNonBlank(row, "loanNumber", "loan_number"));
+            if (loanNumber == null) continue;
+
             Loan loan = loanMap.get(loanNumber);
             if (loan == null) continue;
 
             RateSchedule rs = new RateSchedule();
-            rs.setLoan(loan);
+            rs.setLoanNumber(loanNumber);
+            rs.setPositionFile(loan.getPositionFile());
+            rs.setLoanRef(loan);
 
-            Map<String, Object> extra = new HashMap<>();
-            for (Map.Entry<String, String> entry : row.toMap().entrySet()) {
-                String column = entry.getKey();
-                String value = entry.getValue();
+            String effDate = firstNonBlank(row, "effectiveDate", "effective_date");
+            if (isNotBlank(effDate)) rs.setEffectiveDate(safeDate(effDate));
 
-                if (STANDARD_RATE_COLUMNS.contains(column)) {
-                    switch (column) {
-                        case "effectiveDate" -> rs.setEffectiveDate(LocalDate.parse(value));
-                        case "rate" -> rs.setRate(new BigDecimal(value));
-                    }
-                } else if (!column.equals("loanNumber")) {
-                    extra.put(column, value);
-                }
-            }
+            String rateStr = firstNonBlank(row, "rate", "interestRate", "interest_rate");
+            if (isNotBlank(rateStr)) rs.setRate(safeDecimal(rateStr));
 
-            rs.setExtraFields(extra);
-            rateScheduleRepository.save(rs);
+            toSave.add(rs);
+        }
+
+        if (!toSave.isEmpty()) {
+            rateScheduleRepository.saveAll(toSave);
         }
     }
 
-    private void parseCustomFields(List<CSVRecord> records, Map<String, Loan> loanMap) {
+    private void parseCustomFields(
+            List<CSVRecord> records,
+            Map<String, Loan> loanMap
+    ) {
+        if (records == null || records.isEmpty()) return;
+
+        Map<String, Map<String, Object>> byLoanNumber = new LinkedHashMap<>();
+
         for (CSVRecord row : records) {
-            String loanNumber = row.get("loanNumber");
+            String loanNumber = trimToNull(firstNonBlank(row, "loanNumber", "loan_number"));
+            if (loanNumber == null) continue;
+
             Loan loan = loanMap.get(loanNumber);
             if (loan == null) continue;
 
-            for (Map.Entry<String, String> entry : row.toMap().entrySet()) {
-                String field = entry.getKey();
-                if (field.equals("loanNumber")) continue;
+            Map<String, Object> fields = byLoanNumber.computeIfAbsent(loanNumber, k -> new LinkedHashMap<>());
 
-                CustomField cf = new CustomField();
-                cf.setLoan(loan);
-                cf.setFieldName(field);
-                cf.setFieldValue(entry.getValue());
-
-                customFieldRepository.save(cf);
+            for (Map.Entry<String, String> e : row.toMap().entrySet()) {
+                String col = e.getKey();
+                if (col == null) continue;
+                String colNorm = col.trim();
+                if (colNorm.equalsIgnoreCase("loanNumber") || colNorm.equalsIgnoreCase("loan_number")) continue;
+                fields.put(colNorm, e.getValue());
             }
         }
+
+        if (byLoanNumber.isEmpty()) return;
+
+        List<CustomFields> toSave = new ArrayList<>(byLoanNumber.size());
+        for (Map.Entry<String, Map<String, Object>> entry : byLoanNumber.entrySet()) {
+            String loanNumber = entry.getKey();
+            Map<String, Object> fields = entry.getValue();
+
+            Loan loan = loanMap.get(loanNumber);
+            if (loan == null) continue;
+
+            UUID fileId = loan.getPositionFile().getId();
+
+            CustomFields cf = customFieldsRepository
+                    .findByPositionFile_IdAndLoanNumber(fileId, loanNumber)
+                    .orElseGet(CustomFields::new);
+
+            cf.setLoanNumber(loanNumber);
+            cf.setPositionFile(loan.getPositionFile());
+            cf.setLoanRef(loan);
+            cf.setFields(fields);
+
+            toSave.add(cf);
+        }
+
+        if (!toSave.isEmpty()) {
+            customFieldsRepository.saveAll(toSave);
+        }
     }
+
 
     public PositionFile getById(UUID id) {
         return positionFileRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Position file not found."));
     }
 
+    public long getCustomFieldsCount(UUID positionFileId) {
+        return customFieldsRepository.countByPositionFile_Id(positionFileId);
+    }
+
     @Transactional
     public void deleteById(UUID id) {
         PositionFile file = getById(id);
 
-        // Check if a Position File is locked meaning used in an execution then do not allow the deletion
         if (file.isLocked()) {
             throw new IllegalStateException("Cannot delete a position file that is locked (used in model execution).");
         }
 
-        // Delete dependent data first
-        List<Loan> loans = loanRepository.findAllByPositionFile(file);
-        for (Loan loan : loans) {
-            customFieldRepository.deleteAllByLoan(loan);
-            paymentScheduleRepository.deleteAllByLoan(loan);
-            rateScheduleRepository.deleteAllByLoan(loan);
-        }
-        loanRepository.deleteAll(loans);
+        // Delete children first (order matters due to FKs)
+        customFieldsRepository.deleteByPositionFile(file);
+        paymentScheduleRepository.deleteByPositionFile(file);
+        rateScheduleRepository.deleteByPositionFile(file);
 
-        // Delete file metadata
+        // Delete loans
+        loanRepository.deleteByPositionFile(file);
+
+        // Delete the PositionFile row
         positionFileRepository.delete(file);
 
-        // Optionally delete the ZIP file from disk
+        // Best-effort: remove ZIP from disk
         try {
             Files.deleteIfExists(Paths.get(file.getOriginalFilePath()));
         } catch (IOException e) {
@@ -301,22 +375,17 @@ public class PositionFileService {
 
     public long getPaymentScheduleCount(UUID positionFileId) {
         ensureExists(positionFileId);
-        return paymentScheduleRepository.countByLoan_PositionFile_Id(positionFileId);
+        return paymentScheduleRepository.countByPositionFile_Id(positionFileId);
     }
 
     public long getRateScheduleCount(UUID positionFileId) {
         ensureExists(positionFileId);
-        return rateScheduleRepository.countByLoan_PositionFile_Id(positionFileId);
+        return rateScheduleRepository.countByPositionFile_Id(positionFileId);
     }
 
     public long getCustomFieldCount(UUID positionFileId) {
         ensureExists(positionFileId);
-        return customFieldRepository.countByLoan_PositionFile_Id(positionFileId);
-    }
-
-    public long getCustomFieldLoanCount(UUID positionFileId) {
-        ensureExists(positionFileId);
-        return customFieldRepository.countDistinctLoansInCustomFields(positionFileId);
+        return customFieldsRepository.countByPositionFile_Id(positionFileId);
     }
 
     public PositionFileMetaDTO getMetadata(UUID positionFileId) {
@@ -324,9 +393,9 @@ public class PositionFileService {
                 .orElseThrow(() -> new NoSuchElementException("Position file not found: " + positionFileId));
 
         long loans = loanRepository.countByPositionFile_Id(positionFileId);
-        long schedules = paymentScheduleRepository.countByLoan_PositionFile_Id(positionFileId);
-        long rateRows = rateScheduleRepository.countByLoan_PositionFile_Id(positionFileId);
-        long customFields = customFieldRepository.countByLoan_PositionFile_Id(positionFileId);
+        long schedules = paymentScheduleRepository.countByPositionFile_Id(positionFileId);
+        long rateRows = rateScheduleRepository.countByPositionFile_Id(positionFileId);
+        long customFields = customFieldsRepository.countByPositionFile_Id(positionFileId);
 
         return new PositionFileMetaDTO(
                 pf.getId(),
@@ -340,5 +409,86 @@ public class PositionFileService {
     private void ensureExists(UUID id) {
         if (!exists(id)) throw new NoSuchElementException("Position file not found: " + id);
     }
+
+    public List<PositionFileController.LoanRowDto> fetchLoansSlice(UUID positionFileId, long offset, int limit) {
+        if (limit <= 0) throw new IllegalArgumentException("limit must be > 0");
+
+        int page = (int) Math.floorDiv(offset, Math.max(1, limit));
+        Pageable pageable = PageRequest.of(page, limit, Sort.by("loanNumber").ascending());
+
+        var pageResult = loanRepository.findByPositionFile_Id(positionFileId, pageable);
+
+        return pageResult.getContent().stream()
+                .map(loan -> {
+                    // choose external id
+                    String loanId = (loan.getLoanNumber() != null && !loan.getLoanNumber().isBlank())
+                            ? loan.getLoanNumber()
+                            : loan.getId().toString();
+
+                    // merge standard columns + extraFields into one map
+                    Map<String, Object> fields = new java.util.LinkedHashMap<>();
+                    fields.put("principal", loan.getPrincipal());
+                    fields.put("interestRate", loan.getInterestRate());
+                    fields.put("termMonths", loan.getTermMonths());
+                    fields.put("amortizationType", loan.getAmortizationType());
+                    fields.put("originationDate", loan.getOriginationDate()); // ISO string via Jackson
+
+                    return new PositionFileController.LoanRowDto(loanId, fields);
+                })
+                .toList();
+    }
+
+    /* ---------- helpers ---------- */
+    private static String firstNonBlank(CSVRecord row, String... candidates) {
+        for (String c : candidates) {
+            String v = nullSafeTrim(row.get(c));
+            if (isNotBlank(v)) return v;
+        }
+        return null;
+    }
+
+    private static String nullSafeTrim(String s) {
+        return s == null ? null : s.trim();
+    }
+
+    private static java.time.LocalDate safeDate(String s) {
+        // If your dates are yyyy-MM-dd, this is fine; otherwise plug in a DateTimeFormatter
+        return java.time.LocalDate.parse(s);
+    }
+
+    private static java.math.BigDecimal safeDecimal(String s) {
+        return new java.math.BigDecimal(s);
+    }
+
+    private static String trimToNull(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
+    }
+
+    private static boolean isNotBlank(String s) {
+        return s != null && !s.trim().isEmpty();
+    }
+
+    // return non-null string, replacing null with empty
+    private static String nz(String s) {
+        return (s == null) ? "" : s;
+    }
+
+    // parse int safely, return null if blank or bad
+    private static Integer parseIntSafe(String s) {
+        if (s == null || s.trim().isEmpty()) return null;
+        try {
+            return Integer.parseInt(s.trim());
+        } catch (NumberFormatException e) {
+            return null; // or log/warn and return default
+        }
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.trim().isEmpty();
+    }
+
+
 }
 

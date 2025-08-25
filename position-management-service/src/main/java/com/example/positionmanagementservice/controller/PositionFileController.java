@@ -92,23 +92,44 @@ public class PositionFileController {
         return Map.of("count", positionFileService.getRateScheduleCount(id));
     }
 
-    // (Optional) GET /api/position-files/{id}/custom-fields/count
     @GetMapping("/{id}/custom-fields/count")
-    public Map<String, Long> getCustomFieldCount(@PathVariable UUID id) {
-        return Map.of("count", positionFileService.getCustomFieldCount(id));
+    public Map<String, Long> getCustomFieldsCount(@PathVariable UUID id) {
+        return Map.of("count", positionFileService.getCustomFieldsCount(id));
     }
 
-    // Distinct loans that have any custom fields
-    @GetMapping("/{id}/custom-fields/loans/count")
-    public Map<String, Long> getCustomFieldLoanCount(@PathVariable UUID id) {
-        return Map.of("count", positionFileService.getCustomFieldLoanCount(id));
+    @GetMapping("/{id}/custom-fields/summary")
+    public Map<String, Long> getCustomFieldsSummary(@PathVariable UUID id) {
+        long rows = positionFileService.getCustomFieldsCount(id);
+        return Map.of(
+                "rows", rows,
+                "loansWithCustomFields", rows  // equal in the new schema
+        );
     }
+
 
     // (Optional) GET /api/position-files/{id}/metadata
     @GetMapping("/{id}/metadata")
     public PositionFileMetaDTO getMetadata(@PathVariable UUID id) {
         return positionFileService.getMetadata(id);
     }
+
+
+    @GetMapping("/{id}/loans")
+    public List<LoanRowDto> getLoansSlice(
+            @PathVariable UUID id,
+            @RequestParam long offset,
+            @RequestParam int limit
+    ) {
+        if (limit <= 0) throw new IllegalArgumentException("limit must be > 0");
+        return positionFileService.fetchLoansSlice(id, offset, limit);
+    }
+
+    // DTO returned to Model Execution Service
+    public record LoanRowDto(
+            String loanId,
+            Map<String, Object> fields
+    ) {}
+
 
 }
 

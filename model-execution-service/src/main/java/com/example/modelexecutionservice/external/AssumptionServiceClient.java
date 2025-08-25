@@ -50,7 +50,7 @@ public class AssumptionServiceClient {
     /** GET /api/assumptions/{id}/bundle -> { keyValues: {...}, tables: {tableName: [ {col:val}, ... ] } } */
     public AssumptionBundle getBundle(UUID assumptionSetId) {
         AssumptionBundleResponse resp = client.get()
-                .uri(uriBuilder -> uriBuilder.path("/api/assumptions/{id}/bundle").build(assumptionSetId))
+                .uri(uriBuilder -> uriBuilder.path("/api/assumptions/{id}").build(assumptionSetId))
                 .retrieve()
                 .onStatus(
                         status -> status.is4xxClientError(),
@@ -63,7 +63,7 @@ public class AssumptionServiceClient {
                 .bodyToMono(AssumptionBundleResponse.class)
                 .block();
 
-        if (resp == null) throw new IllegalStateException("Null bundle from assumption service");
+        if (resp == null) throw new IllegalStateException("Null Assumption Set from assumption service");
 
         return new AssumptionBundle(
                 resp.keyValues == null ? Map.of() : resp.keyValues,

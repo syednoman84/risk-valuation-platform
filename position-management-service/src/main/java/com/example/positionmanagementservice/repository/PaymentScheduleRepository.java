@@ -2,19 +2,26 @@ package com.example.positionmanagementservice.repository;
 
 import com.example.positionmanagementservice.entity.Loan;
 import com.example.positionmanagementservice.entity.PaymentSchedule;
-import jakarta.transaction.Transactional;
+import com.example.positionmanagementservice.entity.PositionFile;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 public interface PaymentScheduleRepository extends JpaRepository<PaymentSchedule, UUID> {
+
+    // Or: delete all rows for a file (helpful on re-upload replace)
     @Modifying
     @Transactional
-    @Query("DELETE FROM PaymentSchedule ps WHERE ps.loan = :loan")
-    void deleteAllByLoan(@Param("loan") Loan loan);
+    void deleteByPositionFile(PositionFile positionFile);
 
-    long countByLoan_PositionFile_Id(UUID positionFileId);
+    List<PaymentSchedule> findByPositionFile_IdAndLoanNumber(UUID positionFileId, String loanNumber);
+
+    long countByPositionFile_Id(UUID positionFileId);
+
+    @Modifying
+    @Transactional
+    void deleteByLoanRef(Loan loan);
 }

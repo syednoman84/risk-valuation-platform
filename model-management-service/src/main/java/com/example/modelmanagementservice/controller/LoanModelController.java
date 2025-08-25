@@ -21,10 +21,13 @@ public class LoanModelController {
 
     @PostMapping
     public ResponseEntity<LoanModel> create(@Valid @RequestBody CreateModelRequest request) {
-        return ResponseEntity.ok(service.createModel(
-                request.getName(),
-                request.getDescription(),
-                request.getJsonDefinition()));
+        return ResponseEntity.ok(
+                service.createModel(
+                        request.getName(),
+                        request.getDescription(),
+                        request.getModelDefinition()
+                )
+        );
     }
 
     @GetMapping("/all")

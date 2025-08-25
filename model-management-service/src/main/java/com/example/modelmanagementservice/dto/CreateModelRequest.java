@@ -3,6 +3,9 @@ package com.example.modelmanagementservice.dto;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.validation.constraints.NotNull;
+
 @Data
 public class CreateModelRequest {
 
@@ -12,8 +15,9 @@ public class CreateModelRequest {
     @NotBlank
     private String description;
 
-    @NotBlank
-    private String jsonDefinition;
+    @NotNull
+    private JsonNode modelDefinition; 
 }
+
 
 

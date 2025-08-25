@@ -8,17 +8,16 @@ import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 @Entity
 @Table(name = "loan_models")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class LoanModel {
 
-    @Id
-    @GeneratedValue
+    @Id @GeneratedValue
     private UUID id;
 
     private String name;
@@ -30,7 +29,8 @@ public class LoanModel {
     private LocalDateTime updatedAt;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "jsonb", nullable = false)
-    private String modelDefinition; // or Object if using Jackson serialization
+    @Column(columnDefinition = "jsonb", nullable = false) // Use "json" or omit columnDefinition if MySQL
+    private JsonNode modelDefinition;
 }
+
 

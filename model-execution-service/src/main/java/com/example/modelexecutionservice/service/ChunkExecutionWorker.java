@@ -145,16 +145,31 @@ public class ChunkExecutionWorker {
         ctx.put("assume", bundle.keyValues());
         ctx.put("lookup", (LookupFn) (tableName, keyCol, keyVal, valueCol) ->
                 lookup(bundle.tables(), tableName, keyCol, keyVal, valueCol));
+        
+        // Add loanId from the LoanRow record
+        ctx.put("loanNumber", loan.loanId());
+        
+        log.info("Processing derived fields for loan: {}", loan.loanId());
 
         ObjectNode derivedBag = objectMapper.createObjectNode();
         ObjectNode outputsBag = objectMapper.createObjectNode();
 
+        // Handle both flat and nested model definition structures
         JsonNode derived = modelDef.path("derived");
+        if (!derived.isArray()) {
+            derived = modelDef.path("derivedFields");
+        }
+        log.info("Found derived fields: {}", derived.isArray() ? derived.size() : "none");
         if (derived.isArray()) {
             for (JsonNode d : derived) {
                 String name = d.path("name").asText();
                 String expr = d.path("expr").asText();
+                if (expr.isEmpty()) {
+                    expr = d.path("expression").asText();
+                }
+                log.info("Processing derived field: {} = {}", name, expr);
                 Object val = formulaEngine.evaluate(expr, ctx);
+                log.info("Derived field {} evaluated to: {}", name, val);
                 derivedBag.set(name, toJson(val));
                 ctx.put(name, val);
             }
@@ -164,7 +179,7 @@ public class ChunkExecutionWorker {
         if (outputs.isArray()) {
             for (JsonNode o : outputs) {
                 String name = o.path("name").asText();
-                String expr = o.path("expr").asText();
+                String expr = o.path("expression").asText();
                 Object val = formulaEngine.evaluate(expr, ctx);
                 outputsBag.set(name, toJson(val));
             }

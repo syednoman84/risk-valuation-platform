@@ -2,6 +2,8 @@ package com.example.modelmanagementservice.service;
 
 import com.example.modelmanagementservice.entity.LoanModel;
 import com.example.modelmanagementservice.repository.LoanModelRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -18,7 +20,9 @@ public class LoanModelServiceImpl implements LoanModelService {
     private final LoanModelRepository repository;
 
     @Override
-    public LoanModel createModel(String name, String description, String jsonDefinition) {
+    @Transactional
+    public LoanModel createModel(String name, String description, JsonNode modelDefinition) {
+        // Compute next version for this model name
         List<LoanModel> existingVersions = repository.findAllByName(name);
         int newVersion = existingVersions.stream()
                 .mapToInt(LoanModel::getVersion)
@@ -28,12 +32,16 @@ public class LoanModelServiceImpl implements LoanModelService {
         LoanModel model = LoanModel.builder()
                 .name(name)
                 .version(newVersion)
-                .active(true)
+                .active(true) // optionally deactivate prior versions below
                 .description(description)
-                .modelDefinition(jsonDefinition)  // ✅ store raw JSON directly
+                .modelDefinition(modelDefinition)   // <-- now a JsonNode
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
+
+        // Optional: deactivate older versions of the same model name
+        // existingVersions.forEach(m -> m.setActive(false));
+        // repository.saveAll(existingVersions);
 
         return repository.save(model);
     }
