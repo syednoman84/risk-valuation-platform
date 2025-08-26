@@ -1,0 +1,6 @@
+loanId,principal,creditScore,ltvRatio,propertyType,region,termMonths
+LOAN001,250000,750,0.80,SingleFamily,Northeast,360
+LOAN002,180000,700,0.85,Condo,Southeast,240
+LOAN003,320000,650,0.75,Townhouse,Midwest,360
+LOAN004,450000,600,0.90,MultiFamily,West,300
+LOAN005,75000,550,0.95,Commercial,Southwest,180

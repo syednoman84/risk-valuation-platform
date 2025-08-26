@@ -1,0 +1,66 @@
+{
+  "name": "Advanced Comprehensive Model",
+  "description": "Demonstrates key values, 2-column tables, and multi-column tables",
+  "modelDefinition": {
+    "inputs": {
+      "positionFields": ["loanId", "principal", "creditScore", "ltvRatio", "propertyType", "region", "termMonths"],
+      "assumptionValues": ["baseRate", "riskPremium", "minLoanAmount"],
+      "csvTables": ["credit_multipliers", "regional_adjustments", "property_risk_matrix"]
+    },
+    "derivedFields": [
+      {
+        "name": "effectiveRate",
+        "expression": "fn.toNumber(assumption.keyLookup.baseRate) + fn.toNumber(assumption.keyLookup.riskPremium)"
+      },
+      {
+        "name": "creditMultiplier",
+        "expression": "fn.toNumber(assumption.tableLookup.lookup('credit_multipliers', 'credit_score', creditScore, 'multiplier'))"
+      },
+      {
+        "name": "regionalAdjustment", 
+        "expression": "fn.toNumber(assumption.tableLookup.lookup('regional_adjustments', 'region', region, 'rate_adjustment'))"
+      },
+      {
+        "name": "propertyRiskScore",
+        "expression": "fn.toNumber(assumption.tableLookup.lookup('property_risk_matrix', 'property_type', propertyType, 'risk_score'))"
+      },
+      {
+        "name": "propertyLtvAdjustment",
+        "expression": "fn.toNumber(assumption.tableLookup.lookup('property_risk_matrix', 'property_type', propertyType, 'ltv_adjustment'))"
+      },
+      {
+        "name": "adjustedLtv",
+        "expression": "ltvRatio + propertyLtvAdjustment"
+      },
+      {
+        "name": "finalRate",
+        "expression": "effectiveRate * creditMultiplier + regionalAdjustment"
+      },
+      {
+        "name": "monthlyRate",
+        "expression": "finalRate / 12"
+      },
+      {
+        "name": "loanEligible",
+        "expression": "principal >= fn.toNumber(assumption.keyLookup.minLoanAmount) && adjustedLtv <= 0.95"
+      },
+      {
+        "name": "monthlyPayment",
+        "expression": "loanEligible ? (principal * monthlyRate / (1 - Math.pow(1 + monthlyRate, -termMonths))) : 0"
+      }
+    ],
+    "outputs": [
+      { "name": "loanId", "expression": "loanId" },
+      { "name": "principal", "expression": "principal" },
+      { "name": "creditScore", "expression": "creditScore" },
+      { "name": "effectiveRate", "expression": "effectiveRate" },
+      { "name": "creditMultiplier", "expression": "creditMultiplier" },
+      { "name": "regionalAdjustment", "expression": "regionalAdjustment" },
+      { "name": "propertyRiskScore", "expression": "propertyRiskScore" },
+      { "name": "adjustedLtv", "expression": "adjustedLtv" },
+      { "name": "finalRate", "expression": "finalRate" },
+      { "name": "loanEligible", "expression": "loanEligible" },
+      { "name": "monthlyPayment", "expression": "monthlyPayment" }
+    ]
+  }
+}

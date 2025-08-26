@@ -1,0 +1,6 @@
+region,rate_adjustment
+Northeast,0.002
+Southeast,-0.001
+Midwest,-0.003
+West,0.005
+Southwest,0.001

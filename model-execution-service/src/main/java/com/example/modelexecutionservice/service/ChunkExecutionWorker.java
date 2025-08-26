@@ -93,7 +93,7 @@ public class ChunkExecutionWorker {
 
                 try {
                     ObjectNode output = evaluate(modelDef, loan, bundle);
-                    output.set("_originalLoan", objectMapper.valueToTree(loan.fields()));
+                    output.set("positionData", objectMapper.valueToTree(loan.fields()));
 
                     resultRepo.save(ExecutionResult.builder()
                             .executionId(exec.getId())
@@ -223,8 +223,8 @@ public class ChunkExecutionWorker {
         }
 
         ObjectNode out = objectMapper.createObjectNode();
-        out.set("derived", derivedBag);
-        out.set("outputs", outputsBag);
+        out.set("derivedAttributes", derivedBag);
+        out.set("results", outputsBag);
         return out;
     }
 
