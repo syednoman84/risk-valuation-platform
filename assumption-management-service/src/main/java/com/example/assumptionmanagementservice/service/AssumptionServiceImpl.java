@@ -193,6 +193,58 @@ public class AssumptionServiceImpl implements AssumptionService {
     }
 
     @Override
+    public Map<String, Object> getFormattedAssumptionData(UUID id) throws IOException {
+        AssumptionSet set = getById(id);
+        
+        // Get key-values
+        Map<String, String> keyValues = valueRepository.findAllByAssumptionSet(set)
+                .stream()
+                .collect(Collectors.toMap(AssumptionValue::getKey, AssumptionValue::getValue));
+        
+        // Get tables from CSV files
+        Map<String, List<Map<String, String>>> tables = new HashMap<>();
+        List<AssumptionFile> files = fileRepository.findAllByAssumptionSet(set);
+        
+        for (AssumptionFile file : files) {
+            Path filePath = Paths.get(file.getFilePath());
+            if (Files.exists(filePath)) {
+                List<Map<String, String>> csvData = parseCsvFile(filePath);
+                tables.put(file.getKey(), csvData);
+            }
+        }
+        
+        return Map.of(
+            "id", set.getId(),
+            "name", set.getName(),
+            "description", set.getDescription(),
+            "locked", set.isLocked(),
+            "createdAt", set.getCreatedAt(),
+            "updatedAt", set.getUpdatedAt(),
+            "keyValues", keyValues,
+            "tables", tables
+        );
+    }
+    
+    private List<Map<String, String>> parseCsvFile(Path filePath) throws IOException {
+        List<Map<String, String>> result = new ArrayList<>();
+        List<String> lines = Files.readAllLines(filePath);
+        
+        if (lines.isEmpty()) return result;
+        
+        String[] headers = lines.get(0).split(",");
+        for (int i = 1; i < lines.size(); i++) {
+            String[] values = lines.get(i).split(",");
+            Map<String, String> row = new HashMap<>();
+            for (int j = 0; j < Math.min(headers.length, values.length); j++) {
+                row.put(headers[j].trim(), values[j].trim());
+            }
+            result.add(row);
+        }
+        
+        return result;
+    }
+
+    @Override
     @Transactional
     public void delete(UUID id) {
         AssumptionSet set = getById(id);

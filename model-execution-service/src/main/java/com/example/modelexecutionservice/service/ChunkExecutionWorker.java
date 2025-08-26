@@ -143,13 +143,42 @@ public class ChunkExecutionWorker {
                                 AssumptionServiceClient.AssumptionBundle bundle) {
         Map<String, Object> ctx = new HashMap<>(loan.fields());
         ctx.put("assume", bundle.keyValues());
-        ctx.put("lookup", (LookupFn) (tableName, keyCol, keyVal, valueCol) ->
-                lookup(bundle.tables(), tableName, keyCol, keyVal, valueCol));
+        ctx.put("assumption", new LookupFunction(bundle.tables()));
         
         // Add loanId from the LoanRow record
         ctx.put("loanNumber", loan.loanId());
         
+        // Flatten customFields to root level for easy access
+        Object customFields = loan.fields().get("customFields");
+        if (customFields instanceof Map) {
+            Map<String, Object> customMap = (Map<String, Object>) customFields;
+            for (Map.Entry<String, Object> entry : customMap.entrySet()) {
+                String key = entry.getKey();
+                Object value = entry.getValue();
+                // Convert string numbers to actual numbers
+                if (value instanceof String) {
+                    String strValue = (String) value;
+                    try {
+                        if (strValue.contains(".")) {
+                            ctx.put(key, Double.parseDouble(strValue));
+                        } else {
+                            ctx.put(key, Integer.parseInt(strValue));
+                        }
+                    } catch (NumberFormatException e) {
+                        ctx.put(key, value); // keep as string if not a number
+                    }
+                } else {
+                    ctx.put(key, value);
+                }
+            }
+        }
+        
         log.info("Processing derived fields for loan: {}", loan.loanId());
+        log.info("Available loan fields: {}", loan.fields().keySet());
+        log.info("Assumption bundle tables: {}", bundle.tables().keySet());
+        log.info("Lookup function in context: {}", ctx.get("lookup") != null);
+        log.info("Context keys: {}", ctx.keySet());
+        log.info("creditScore value: {}", ctx.get("creditScore"));
 
         ObjectNode derivedBag = objectMapper.createObjectNode();
         ObjectNode outputsBag = objectMapper.createObjectNode();
@@ -168,6 +197,9 @@ public class ChunkExecutionWorker {
                     expr = d.path("expression").asText();
                 }
                 log.info("Processing derived field: {} = {}", name, expr);
+                
+
+                
                 Object val = formulaEngine.evaluate(expr, ctx);
                 log.info("Derived field {} evaluated to: {}", name, val);
                 derivedBag.set(name, toJson(val));
@@ -276,6 +308,18 @@ public class ChunkExecutionWorker {
     @FunctionalInterface
     public interface LookupFn {
         Object apply(String tableName, String keyCol, Object keyVal, String valueCol);
+    }
+
+    public static class LookupFunction {
+        private final Map<String, List<Map<String, Object>>> tables;
+
+        public LookupFunction(Map<String, List<Map<String, Object>>> tables) {
+            this.tables = tables;
+        }
+
+        public Object lookup(String tableName, String keyCol, Object keyVal, String valueCol) {
+            return ChunkExecutionWorker.lookup(tables, tableName, keyCol, keyVal, valueCol);
+        }
     }
 
     private static String truncate(String s) {

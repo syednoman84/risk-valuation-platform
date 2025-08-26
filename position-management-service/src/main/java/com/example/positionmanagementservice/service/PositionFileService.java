@@ -413,6 +413,96 @@ public class PositionFileService {
     public List<PositionFileController.LoanRowDto> fetchLoansSlice(UUID positionFileId, long offset, int limit) {
         if (limit <= 0) throw new IllegalArgumentException("limit must be > 0");
 
+        int page = Math.floorDiv((int) offset, Math.max(1, limit));
+        Pageable pageable = PageRequest.of(page, limit, Sort.by("loanNumber").ascending());
+
+        var loanPage = loanRepository.findByPositionFile_Id(positionFileId, pageable);
+        var loans = loanPage.getContent();
+        if (loans.isEmpty()) return List.of();
+
+        // Collect loanNumbers in this slice
+        Set<String> loanNumbers = loans.stream()
+                .map(Loan::getLoanNumber)
+                .filter(s -> s != null && !s.isBlank())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        // ---- Bulk fetch related data for this slice ----
+
+        // Payment Schedules, grouped by loanNumber
+        Map<String, List<PaymentSchedule>> psByLoan = paymentScheduleRepository
+                .findByPositionFile_IdAndLoanNumberIn(positionFileId, loanNumbers)
+                .stream()
+                .collect(Collectors.groupingBy(PaymentSchedule::getLoanNumber));
+
+        // Rate Schedules, grouped by loanNumber
+        Map<String, List<RateSchedule>> rsByLoan = rateScheduleRepository
+                .findByPositionFile_IdAndLoanNumberIn(positionFileId, loanNumbers)
+                .stream()
+                .collect(Collectors.groupingBy(RateSchedule::getLoanNumber));
+
+        // Custom Fields (1 row per loanNumber), map by loanNumber
+        Map<String, CustomFields> cfByLoan = customFieldsRepository
+                .findByPositionFile_IdAndLoanNumberIn(positionFileId, loanNumbers)
+                .stream()
+                .collect(Collectors.toMap(CustomFields::getLoanNumber, Function.identity(), (a, b) -> a, LinkedHashMap::new));
+
+        // ---- Assemble DTOs ----
+        return loans.stream()
+                .map(loan -> {
+                    String loanId = (loan.getLoanNumber() != null && !loan.getLoanNumber().isBlank())
+                            ? loan.getLoanNumber()
+                            : loan.getId().toString();
+
+                    Map<String, Object> fields = new LinkedHashMap<>();
+                    // loan.csv (standard)
+                    fields.put("principal", loan.getPrincipal());
+                    fields.put("interestRate", loan.getInterestRate());
+                    fields.put("termMonths", loan.getTermMonths());
+                    fields.put("amortizationType", loan.getAmortizationType());
+                    fields.put("originationDate", loan.getOriginationDate());
+
+                    // paymentschedule.csv → list of objects
+                    List<Map<String, Object>> paymentScheduleList = psByLoan.getOrDefault(loan.getLoanNumber(), List.of())
+                            .stream()
+                            .map(ps -> {
+                                Map<String, Object> m = new LinkedHashMap<>();
+                                m.put("startDate", ps.getStartDate());
+                                m.put("endDate", ps.getEndDate());
+                                m.put("monthlyPayment", ps.getMonthlyPayment());
+                                m.put("interestPayment", ps.getInterestPayment());
+                                m.put("principalPayment", ps.getPrincipalPayment());
+                                m.put("paymentType", ps.getPaymentType());
+                                return m;
+                            })
+                            .toList();
+                    fields.put("paymentSchedule", paymentScheduleList);
+
+                    // rateschedule.csv → list of objects
+                    List<Map<String, Object>> rateScheduleList = rsByLoan.getOrDefault(loan.getLoanNumber(), List.of())
+                            .stream()
+                            .map(rs -> {
+                                Map<String, Object> m = new LinkedHashMap<>();
+                                m.put("effectiveDate", rs.getEffectiveDate());
+                                m.put("rate", rs.getRate());
+                                return m;
+                            })
+                            .toList();
+                    fields.put("rateSchedule", rateScheduleList);
+
+                    // customfields.csv → single JSON map per loan (as stored)
+                    Map<String, Object> custom = Optional.ofNullable(cfByLoan.get(loan.getLoanNumber()))
+                            .map(CustomFields::getFields)
+                            .orElse(Map.of());
+                    fields.put("customFields", custom);
+
+                    return new PositionFileController.LoanRowDto(loanId, fields);
+                })
+                .toList();
+    }
+
+    /*public List<PositionFileController.LoanRowDto> fetchLoansSlice(UUID positionFileId, long offset, int limit) {
+        if (limit <= 0) throw new IllegalArgumentException("limit must be > 0");
+
         int page = (int) Math.floorDiv(offset, Math.max(1, limit));
         Pageable pageable = PageRequest.of(page, limit, Sort.by("loanNumber").ascending());
 
@@ -436,7 +526,7 @@ public class PositionFileService {
                     return new PositionFileController.LoanRowDto(loanId, fields);
                 })
                 .toList();
-    }
+    }*/
 
     /* ---------- helpers ---------- */
     private static String firstNonBlank(CSVRecord row, String... candidates) {

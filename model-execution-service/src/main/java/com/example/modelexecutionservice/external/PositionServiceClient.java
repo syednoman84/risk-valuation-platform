@@ -1,6 +1,7 @@
 package com.example.modelexecutionservice.external;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -10,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+@Slf4j
 @Component
 public class PositionServiceClient {
     private final WebClient client;
@@ -22,6 +24,8 @@ public class PositionServiceClient {
         // Example endpoint: GET /position-files/{id}/loans/count -> { "count": 12345 }
         record CountResp(long count) {}
 
+        String url = "/api/positions/" + positionFileId + "/loans/count";
+        log.info("Making API call to Position Service: GET {}", url);
         CountResp resp = client.get()
                 .uri(uriBuilder -> uriBuilder.path("/api/positions/{id}/loans/count")
                         .build(positionFileId))
@@ -75,6 +79,9 @@ public class PositionServiceClient {
 
     /** GET /api/positions/{id}/loans?offset=...&limit=... -> [ {loanId, fields{...}}, ... ] */
     public List<LoanRow> getLoansSlice(UUID positionFileId, long offset, int limit) {
+        log.info("Fetching loans slice from position service: positionFileId={}, offset={}, limit={}", positionFileId, offset, limit);
+        String url = "/api/positions/" + positionFileId + "/loans?offset=" + offset + "&limit=" + limit;
+        log.info("Making API call to Position Service: GET {}", url);
         LoanRowResponse[] resp = client.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/api/positions/{id}/loans")

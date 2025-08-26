@@ -19,6 +19,8 @@ public interface AssumptionService {
 
     AssumptionSetDto getDtoById(UUID id);
 
+    Map<String, Object> getFormattedAssumptionData(UUID id) throws IOException;
+
     void delete(UUID id);
     ByteArrayResource downloadZip(UUID assumptionSetId) throws IOException;
 

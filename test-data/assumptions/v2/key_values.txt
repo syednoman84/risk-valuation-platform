@@ -1,0 +1,5 @@
+base_rate = 0.99
+prepayment_enabled = false
+stress_factor = 1.10
+base_annual_rate = 0.08
+default_term_months = 120

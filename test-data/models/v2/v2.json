@@ -1,0 +1,66 @@
+{
+    "name": "Working Model v2 - Final with assumption.lookup",
+    "description": "Working Model v2 with clean assumption.lookup syntax",
+    "modelDefinition": {
+      "inputs": {
+        "positionFields": ["loanNumber","principal","interestRate","termMonths","originationDate","creditScore","ltvRatio"],
+        "assumptionValues": ["base_annual_rate","default_term_months"],
+        "csvTables": ["credit_adjustments","default_matrix"]
+      },
+      "derivedFields": [
+        {
+          "name": "annualRate",
+          "expression": "(interestRate != null) ? interestRate : 5.0"
+        },
+        {
+          "name": "term",
+          "expression": "(termMonths != null) ? termMonths : 360"
+        },
+        {
+          "name": "creditAdjustment",
+          "expression": "fn.toNumber(assumption.lookup('credit_adjustments', 'credit_score', creditScore, 'rate_adjustment'))"
+        },
+        {
+          "name": "ltvBucket",
+          "expression": "(ltvRatio <= 0.8) ? 'low' : (ltvRatio <= 0.9) ? 'medium' : 'high'"
+        },
+        {
+          "name": "termBucket", 
+          "expression": "(term <= 180) ? 'short' : (term <= 300) ? 'medium' : 'long'"
+        },
+        {
+          "name": "defaultRate",
+          "expression": "fn.toNumber(assumption.lookup('default_matrix', 'ltv_bucket', ltvBucket, 'long_term'))"
+        },
+        {
+          "name": "adjustedRate",
+          "expression": "annualRate + (creditAdjustment != null ? creditAdjustment : 0)"
+        },
+        {
+          "name": "monthlyRate",
+          "expression": "adjustedRate / 12"
+        },
+        {
+          "name": "monthlyInterest",
+          "expression": "principal * monthlyRate"
+        },
+        {
+          "name": "pmt",
+          "expression": "(term != null && monthlyRate != null && monthlyRate > 0) ? (principal * monthlyRate / (1 - Math.pow(1 + monthlyRate, -term))) : null"
+        }
+      ],
+      "outputs": [
+        { "name": "loanNumber",       "expression": "loanNumber" },
+        { "name": "principal",        "expression": "principal" },
+        { "name": "creditScore",      "expression": "creditScore" },
+        { "name": "ltvRatio",         "expression": "ltvRatio" },
+        { "name": "creditAdjustment", "expression": "creditAdjustment" },
+        { "name": "defaultRate",      "expression": "defaultRate" },
+        { "name": "adjustedRate",     "expression": "adjustedRate" },
+        { "name": "term",             "expression": "term" },
+        { "name": "monthlyRate",      "expression": "monthlyRate" },
+        { "name": "monthlyInterest",  "expression": "monthlyInterest" },
+        { "name": "pmt",              "expression": "pmt" }
+      ]
+    }
+  }

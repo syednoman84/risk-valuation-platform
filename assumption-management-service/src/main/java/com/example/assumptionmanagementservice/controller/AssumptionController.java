@@ -42,8 +42,30 @@ public class AssumptionController {
 
 
     @GetMapping("/{id}")
-    public ResponseEntity<AssumptionSetDto> getById(@PathVariable UUID id) {
-        return ResponseEntity.ok(assumptionService.getDtoById(id));
+    public ResponseEntity<?> getById(@PathVariable UUID id, @RequestParam(defaultValue = "false") boolean hardcoded) throws IOException {
+        if (hardcoded) {
+            return ResponseEntity.ok(Map.of(
+                "id", UUID.fromString("00000000-0000-0000-0000-000000000000"),
+                "name", "Mock Assumption Set",
+                "description", "Hardcoded test data",
+                "locked", false,
+                "createdAt", java.time.LocalDateTime.now(),
+                "updatedAt", java.time.LocalDateTime.now(),
+                "keyValues", Map.of(
+                    "base_annual_rate", "0.08",
+                    "default_term_months", "120"
+                ),
+                "tables", Map.of(
+                    "credit_adjustments", List.of(
+                        Map.of("credit_score", "650", "rate_adjustment", "0.5")
+                    ),
+                    "default_matrix", List.of(
+                        Map.of("ltv_bucket", "low", "short_term", "0.01")
+                    )
+                )
+            ));
+        }
+        return ResponseEntity.ok(assumptionService.getFormattedAssumptionData(id));
     }
 
     @DeleteMapping("/{id}")

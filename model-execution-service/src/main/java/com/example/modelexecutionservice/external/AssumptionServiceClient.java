@@ -1,6 +1,8 @@
 package com.example.modelexecutionservice.external;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -10,12 +12,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+@Slf4j
 @Component
 public class AssumptionServiceClient {
     private final WebClient client;
+    private final boolean useHardcodedAssumptions;
 
-    public AssumptionServiceClient(WebClient assumptionWebClient) {
+    public AssumptionServiceClient(WebClient assumptionWebClient, 
+                                   @Value("${assumptions.use-hardcoded:false}") boolean useHardcodedAssumptions) {
         this.client = assumptionWebClient;
+        this.useHardcodedAssumptions = useHardcodedAssumptions;
     }
 
     public void assertExists(UUID assumptionSetId) {
@@ -49,8 +55,16 @@ public class AssumptionServiceClient {
 
     /** GET /api/assumptions/{id}/bundle -> { keyValues: {...}, tables: {tableName: [ {col:val}, ... ] } } */
     public AssumptionBundle getBundle(UUID assumptionSetId) {
+        String url = "/api/assumptions/" + assumptionSetId + (useHardcodedAssumptions ? "?hardcoded=true" : "");
+        log.info("Making API call to Assumption Service: GET {}", url);
         AssumptionBundleResponse resp = client.get()
-                .uri(uriBuilder -> uriBuilder.path("/api/assumptions/{id}").build(assumptionSetId))
+                .uri(uriBuilder -> {
+                    var builder = uriBuilder.path("/api/assumptions/{id}");
+                    if (useHardcodedAssumptions) {
+                        builder.queryParam("hardcoded", "true");
+                    }
+                    return builder.build(assumptionSetId);
+                })
                 .retrieve()
                 .onStatus(
                         status -> status.is4xxClientError(),

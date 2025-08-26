@@ -46,13 +46,29 @@ public class DefaultFormulaEngine implements FormulaEngine {
             throw new FormulaEvaluationException("Expression is null or blank");
         }
         try {
-            final Serializable compiled = compiledCache.computeIfAbsent(expression, MVEL::compileExpression);
-
             // Merge user ctx + built-ins
             Map<String, Object> vars = new HashMap<>();
             if (context != null) vars.putAll(context);
             vars.putIfAbsent("fn", new Functions(mc)); // expose helpers under "fn"
 
+            // For lookup expressions, disable all optimization
+            if (expression.contains("lookup")) {
+                // Completely disable optimization by setting system property
+                String oldOptLevel = System.getProperty("mvel2.disable.jit");
+                System.setProperty("mvel2.disable.jit", "true");
+                try {
+                    return MVEL.eval(expression, vars);
+                } finally {
+                    if (oldOptLevel != null) {
+                        System.setProperty("mvel2.disable.jit", oldOptLevel);
+                    } else {
+                        System.clearProperty("mvel2.disable.jit");
+                    }
+                }
+            }
+            
+            // Use compiled/cached version for other expressions
+            final Serializable compiled = compiledCache.computeIfAbsent(expression, MVEL::compileExpression);
             return MVEL.executeExpression(compiled, vars);
         } catch (Exception ex) {
             throw new FormulaEvaluationException("Failed to evaluate expression: " + expression, ex);

@@ -2,6 +2,7 @@ package com.example.modelexecutionservice.external;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -9,6 +10,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
+@Slf4j
 @Component
 public class ModelServiceClient {
     private final WebClient client;
@@ -45,6 +47,8 @@ public class ModelServiceClient {
     ) {}
 
     public ModelDetails getById(UUID modelId) {
+        String url = "/api/models/" + modelId;
+        log.info("Making API call to Model Service: GET {}", url);
         return client.get()
                 .uri(b -> b.path("/api/models/{id}").build(modelId))
                 .retrieve()
@@ -63,6 +67,8 @@ public class ModelServiceClient {
     public JsonNode getDefinition(UUID modelId, Integer version) {
         // Try dedicated definition endpoint (if your model service supports it)
         try {
+            String defUrl = "/api/models/" + modelId + "/definition";
+            log.info("Making API call to Model Service: GET {}", defUrl);
             JsonNode viaDefinitionEndpoint = client.get()
                     .uri(b -> b.path("/api/models/{id}/definition").build(modelId))
                     .retrieve()
