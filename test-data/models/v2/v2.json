@@ -1,5 +1,5 @@
 {
-    "name": "Working Model v2 - Final with assumption.lookup",
+    "name": "Working Model v2 With Tables Lookup",
     "description": "Working Model v2 with clean assumption.lookup syntax",
     "modelDefinition": {
       "inputs": {
@@ -18,7 +18,7 @@
         },
         {
           "name": "creditAdjustment",
-          "expression": "fn.toNumber(assumption.lookup('credit_adjustments', 'credit_score', creditScore, 'rate_adjustment'))"
+          "expression": "fn.toNumber(assumption.tableLookup.lookup('credit_adjustments', 'credit_score', creditScore, 'rate_adjustment'))"
         },
         {
           "name": "ltvBucket",
@@ -30,7 +30,7 @@
         },
         {
           "name": "defaultRate",
-          "expression": "fn.toNumber(assumption.lookup('default_matrix', 'ltv_bucket', ltvBucket, 'long_term'))"
+          "expression": "fn.toNumber(assumption.tableLookup.lookup('default_matrix', 'ltv_bucket', ltvBucket, 'long_term'))"
         },
         {
           "name": "adjustedRate",

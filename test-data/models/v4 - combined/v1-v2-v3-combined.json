@@ -1,0 +1,122 @@
+{
+  "name": "V1 V2 and V3 Models Combined",
+  "description": "Combining 3 models to test all expressions together",
+  "modelDefinition": {
+    "inputs": {
+      "positionFields": ["loanId", "pd", "lgd", "ead", "stage", "timeToDefault", "principal","interestRate","termMonths","originationDate","creditScore","ltvRatio"],
+      "assumptionValues": ["discountRate", "macroeconomicAdjustment", "minimumProvision", "base_annual_rate", "default_term_months"],
+      "csvTables": ["credit_adjustments","default_matrix"]
+    },
+    "derivedFields": [
+      {
+        "name": "discountFactor",
+        "expression": "1 / Math.pow(1 + assumption.keyLookup.discountRate, timeToDefault)"
+      },
+      {
+        "name": "baseECL",
+        "expression": "pd * lgd * ead * discountFactor"
+      },
+      {
+        "name": "stageMultiplier",
+        "expression": "(stage == 1) ? 1.0 : (stage == 2) ? 2.5 : 5.0"
+      },
+      {
+        "name": "adjustedECL",
+        "expression": "baseECL * assumption.keyLookup.macroeconomicAdjustment * stageMultiplier"
+      },
+      {
+        "name": "finalECL",
+        "expression": "Math.max(adjustedECL, assumption.keyLookup.minimumProvision * ead)"
+      },
+      {
+        "name": "annualRate_v2",
+        "expression": "(interestRate != null) ? interestRate : 5.0"
+      },
+      {
+        "name": "term_v2",
+        "expression": "(termMonths != null) ? termMonths : 360"
+      },
+      {
+        "name": "creditAdjustment_v2",
+        "expression": "fn.toNumber(assumption.tableLookup.lookup('credit_adjustments', 'credit_score', creditScore, 'rate_adjustment'))"
+      },
+      {
+        "name": "ltvBucket_v2",
+        "expression": "(ltvRatio <= 0.8) ? 'low' : (ltvRatio <= 0.9) ? 'medium' : 'high'"
+      },
+      {
+        "name": "termBucket_v2",
+        "expression": "(term_v2 <= 180) ? 'short' : (term_v2 <= 300) ? 'medium' : 'long'"
+      },
+      {
+        "name": "defaultRate_v2",
+        "expression": "fn.toNumber(assumption.tableLookup.lookup('default_matrix', 'ltv_bucket', ltvBucket_v2, 'long_term'))"
+      },
+      {
+        "name": "adjustedRate_v2",
+        "expression": "annualRate_v2 + (creditAdjustment_v2 != null ? creditAdjustment_v2 : 0)"
+      },
+      {
+        "name": "monthlyRate_v2",
+        "expression": "adjustedRate_v2 / 12"
+      },
+      {
+        "name": "monthlyInterest_v2",
+        "expression": "principal * monthlyRate_v2"
+      },
+      {
+        "name": "pmt_v2",
+        "expression": "(term_v2 != null && monthlyRate_v2 != null && monthlyRate_v2 > 0) ? (principal * monthlyRate_v2 / (1 - Math.pow(1 + monthlyRate_v2, -term_v2))) : null"
+      },
+      {
+        "name": "annualRate_v1",
+        "expression": "(interestRate != null) ? interestRate : assumption.keyLookup.base_annual_rate"
+      },
+      {
+        "name": "term_v1",
+        "expression": "(termMonths != null) ? termMonths : assumption.keyLookup.default_term_months"
+      },
+      {
+        "name": "monthlyRate_v1",
+        "expression": "annualRate_v1 / 12"
+      },
+      {
+        "name": "monthlyInterest_v1",
+        "expression": "principal * monthlyRate_v1"
+      },
+      {
+        "name": "pmt_v1",
+        "expression": "(term_v1 != null && monthlyRate_v1 != null && monthlyRate_v1 > 0) ? (principal * monthlyRate_v1 / (1 - Math.pow(1 + monthlyRate_v1, -term_v1))) : null"
+      }
+    ],
+    "outputs": [
+      { "name": "loanId", "expression": "loanId" },
+      { "name": "pd_v3", "expression": "pd" },
+      { "name": "lgd_v3", "expression": "lgd" },
+      { "name": "ead_v3", "expression": "ead" },
+      { "name": "stage_v3", "expression": "stage" },
+      { "name": "timeToDefault_v3", "expression": "timeToDefault" },
+      { "name": "discountFactor_v3", "expression": "discountFactor" },
+      { "name": "baseECL_v3", "expression": "baseECL" },
+      { "name": "stageMultiplier_v3", "expression": "stageMultiplier" },
+      { "name": "adjustedECL_v3", "expression": "adjustedECL" },
+      { "name": "finalECL_v3", "expression": "finalECL" },
+      { "name": "principal_v2",        "expression": "principal" },
+      { "name": "creditScore_v2",      "expression": "creditScore" },
+      { "name": "ltvRatio_v2",         "expression": "ltvRatio" },
+      { "name": "creditAdjustment_v2", "expression": "creditAdjustment_v2" },
+      { "name": "defaultRate_v2",      "expression": "defaultRate_v2" },
+      { "name": "adjustedRate_v2",     "expression": "adjustedRate_v2" },
+      { "name": "term_v2",             "expression": "term_v2" },
+      { "name": "monthlyRate_v2",      "expression": "monthlyRate_v2" },
+      { "name": "monthlyInterest_v2",  "expression": "monthlyInterest_v2" },
+      { "name": "pmt_v2",              "expression": "pmt_v2" },
+      { "name": "principal_v1",        "expression": "principal" },
+      { "name": "annualRate_v1",       "expression": "annualRate_v1" },
+      { "name": "term_v1",             "expression": "term_v1" },
+      { "name": "monthlyRate_v1",      "expression": "monthlyRate_v1" },
+      { "name": "monthlyInterest_v1",  "expression": "monthlyInterest_v1" },
+      { "name": "pmt_v1",              "expression": "pmt_v1" }
+    ]
+  }
+}

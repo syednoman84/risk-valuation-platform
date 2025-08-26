@@ -1,0 +1,45 @@
+{
+  "name": "CECL_Expected_Credit_Loss",
+  "description": "Current Expected Credit Loss model for loan loss provisioning under CECL accounting standards",
+  "modelDefinition": {
+    "inputs": {
+      "positionFields": ["loanId", "pd", "lgd", "ead", "stage", "timeToDefault"],
+      "assumptionValues": ["discountRate", "macroeconomicAdjustment", "minimumProvision"]
+    },
+    "derivedFields": [
+      {
+        "name": "discountFactor",
+        "expression": "1 / Math.pow(1 + assumption.keyLookup.discountRate, timeToDefault)"
+      },
+      {
+        "name": "baseECL",
+        "expression": "pd * lgd * ead * discountFactor"
+      },
+      {
+        "name": "stageMultiplier",
+        "expression": "(stage == 1) ? 1.0 : (stage == 2) ? 2.5 : 5.0"
+      },
+      {
+        "name": "adjustedECL",
+        "expression": "baseECL * assumption.keyLookup.macroeconomicAdjustment * stageMultiplier"
+      },
+      {
+        "name": "finalECL",
+        "expression": "Math.max(adjustedECL, assumption.keyLookup.minimumProvision * ead)"
+      }
+    ],
+    "outputs": [
+      { "name": "loanId", "expression": "loanId" },
+      { "name": "pd", "expression": "pd" },
+      { "name": "lgd", "expression": "lgd" },
+      { "name": "ead", "expression": "ead" },
+      { "name": "stage", "expression": "stage" },
+      { "name": "timeToDefault", "expression": "timeToDefault" },
+      { "name": "discountFactor", "expression": "discountFactor" },
+      { "name": "baseECL", "expression": "baseECL" },
+      { "name": "stageMultiplier", "expression": "stageMultiplier" },
+      { "name": "adjustedECL", "expression": "adjustedECL" },
+      { "name": "finalECL", "expression": "finalECL" }
+    ]
+  }
+}

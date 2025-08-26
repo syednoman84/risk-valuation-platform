@@ -9,11 +9,11 @@
     "derivedFields": [
       {
         "name": "annualRate",
-        "expression": "(interestRate != null) ? interestRate : assume.base_annual_rate"
+        "expression": "(interestRate != null) ? interestRate : assumption.keyLookup.base_annual_rate"
       },
       {
         "name": "term",
-        "expression": "(termMonths != null) ? termMonths : assume.default_term_months"
+        "expression": "(termMonths != null) ? termMonths : assumption.keyLookup.default_term_months"
       },
       {
         "name": "monthlyRate",

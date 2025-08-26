@@ -142,10 +142,15 @@ public class ChunkExecutionWorker {
                                 PositionServiceClient.LoanRow loan,
                                 AssumptionServiceClient.AssumptionBundle bundle) {
         Map<String, Object> ctx = new HashMap<>(loan.fields());
-        ctx.put("assume", bundle.keyValues());
-        ctx.put("assumption", new LookupFunction(bundle.tables()));
         
-        // Add loanId from the LoanRow record
+        // Create assumption object with keyLookup and tableLookup
+        Map<String, Object> assumptionObj = new HashMap<>();
+        assumptionObj.put("keyLookup", bundle.keyValues());
+        assumptionObj.put("tableLookup", new LookupFunction(bundle.tables()));
+        ctx.put("assumption", assumptionObj);
+        
+        // Add loanId from the LoanRow record (both loanId and loanNumber for compatibility)
+        ctx.put("loanId", loan.loanId());
         ctx.put("loanNumber", loan.loanId());
         
         // Flatten customFields to root level for easy access
