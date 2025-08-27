@@ -11,36 +11,30 @@ import java.util.UUID;
 @Table(
         name = "rate_schedule",
         indexes = {
-                @Index(name = "idx_rs_file_loannumber", columnList = "position_file_id, loan_number"),
                 @Index(name = "idx_rs_loannumber", columnList = "loan_number")
         }
 )
 @Data
 public class RateSchedule {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private UUID id;
+    @EmbeddedId
+    private RateScheduleId id;
 
-    @Column(name = "loan_number", nullable = false, length = 128)
-    private String loanNumber;
+    // Helper methods
+    public UUID getPositionFileId() {
+        return id != null ? id.getPositionFileId() : null;
+    }
 
-    @Column(name = "effective_date", nullable = false)
-    private LocalDate effectiveDate;
+    public String getLoanNumber() {
+        return id != null ? id.getLoanNumber() : null;
+    }
+
+    public LocalDate getEffectiveDate() {
+        return id != null ? id.getEffectiveDate() : null;
+    }
 
     @Column(name = "rate", nullable = false)
     private BigDecimal rate;
 
-    // FK to position_file
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "position_file_id", nullable = false)
-    private PositionFile positionFile;
 
-    // Composite ref to Loan (see note in PaymentSchedule)
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumns(value = {
-            @JoinColumn(name = "position_file_id", referencedColumnName = "position_file_id", insertable = false, updatable = false),
-            @JoinColumn(name = "loan_number", referencedColumnName = "loan_number", insertable = false, updatable = false)
-    })
-    private Loan loanRef;
 }

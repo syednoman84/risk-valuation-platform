@@ -70,6 +70,7 @@ public class AssumptionServiceImpl implements AssumptionService {
             val.setValue(value);
             valueRepository.save(val);
         }
+        valueRepository.flush();
 
         // Save associated CSV files
         for (Map.Entry<String, MultipartFile> entry : csvFiles.entrySet()) {
@@ -86,8 +87,91 @@ public class AssumptionServiceImpl implements AssumptionService {
 
             fileRepository.save(assumptionFile);
         }
+        fileRepository.flush();
 
         return set.getId();
+    }
+
+    @Override
+    @Transactional
+    public AssumptionSetDto createAssumptionSetAndReturnDto(String name, String description, Map<String, String> keyValues, Map<String, MultipartFile> csvFiles) throws IOException {
+        if (setRepository.existsByName(name)) {
+            throw new IllegalArgumentException("Assumption set with name '" + name + "' already exists.");
+        }
+
+        // Save Assumption Set
+        AssumptionSet set = new AssumptionSet();
+        set.setName(name);
+        set.setDescription(description);
+        set.setCreatedAt(LocalDateTime.now());
+        set.setUpdatedAt(LocalDateTime.now());
+        set = setRepository.save(set);
+
+        // Build DTO
+        AssumptionSetDto dto = new AssumptionSetDto();
+        dto.setId(set.getId());
+        dto.setName(set.getName());
+        dto.setDescription(set.getDescription());
+        dto.setLocked(set.isLocked());
+        dto.setCreatedAt(set.getCreatedAt());
+        dto.setUpdatedAt(set.getUpdatedAt());
+
+        List<AssumptionValueDto> kvDtos = new ArrayList<>();
+        List<AssumptionFileDto> fileDtos = new ArrayList<>();
+
+        // Save key-values and build DTOs
+        for (Map.Entry<String, String> entry : keyValues.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue();
+
+            if (key.equalsIgnoreCase("name") || key.equalsIgnoreCase("description")) {
+                log.warn("Skipping reserved key '{}' during assumption set creation.", key);
+                continue;
+            }
+
+            AssumptionValue val = new AssumptionValue();
+            val.setAssumptionSet(set);
+            val.setKey(key);
+            val.setValue(value);
+            val = valueRepository.save(val);
+
+            // Build DTO
+            AssumptionValueDto vDto = new AssumptionValueDto();
+            vDto.setId(val.getId());
+            vDto.setKey(val.getKey());
+            vDto.setValue(val.getValue());
+            vDto.setCreatedAt(val.getCreatedAt());
+            kvDtos.add(vDto);
+        }
+
+        // Save files and build DTOs
+        for (Map.Entry<String, MultipartFile> entry : csvFiles.entrySet()) {
+            String key = entry.getKey();
+            MultipartFile file = entry.getValue();
+
+            String storedPath = fileStorageService.save(file, set.getName(), key);
+            AssumptionFile assumptionFile = new AssumptionFile();
+            assumptionFile.setAssumptionSet(set);
+            assumptionFile.setKey(key);
+            assumptionFile.setOriginalFileName(file.getOriginalFilename());
+            assumptionFile.setFilePath(storedPath);
+            assumptionFile.setUploadedAt(LocalDateTime.now());
+            assumptionFile = fileRepository.save(assumptionFile);
+
+            // Build DTO
+            AssumptionFileDto fDto = new AssumptionFileDto();
+            fDto.setId(assumptionFile.getId());
+            fDto.setKey(assumptionFile.getKey());
+            fDto.setOriginalFileName(assumptionFile.getOriginalFileName());
+            fDto.setFilePath(assumptionFile.getFilePath());
+            fDto.setUploadedAt(assumptionFile.getUploadedAt());
+            fileDtos.add(fDto);
+        }
+
+        dto.setTextBasedAssumptions(kvDtos);
+        dto.setFileBasedAssumptions(fileDtos);
+
+        return dto;
     }
 
     @Override

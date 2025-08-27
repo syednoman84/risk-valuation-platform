@@ -10,38 +10,21 @@ import java.util.Map;
 import java.util.UUID;
 
 @Entity
-@Table(
-        name = "custom_fields",
-        uniqueConstraints = {
-                // One row of aggregated custom fields per (file, loanNumber)
-                @UniqueConstraint(name = "uq_cf_file_loannumber", columnNames = {"position_file_id", "loan_number"})
-        },
-        indexes = {
-                @Index(name = "idx_cf_file_loannumber", columnList = "position_file_id, loan_number")
-        }
-)
+@Table(name = "custom_fields")
 @Data
 public class CustomFields {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private UUID id;
+    @EmbeddedId
+    private CustomFieldId id;
 
-    @Column(name = "loan_number", nullable = false, length = 128)
-    private String loanNumber;
+    // Helper methods
+    public UUID getPositionFileId() {
+        return id != null ? id.getPositionFileId() : null;
+    }
 
-    // FK to position_file
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "position_file_id", nullable = false)
-    private PositionFile positionFile;
-
-    // Composite ref to Loan (see note in PaymentSchedule)
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumns(value = {
-            @JoinColumn(name = "position_file_id", referencedColumnName = "position_file_id", insertable = false, updatable = false),
-            @JoinColumn(name = "loan_number", referencedColumnName = "loan_number", insertable = false, updatable = false)
-    })
-    private Loan loanRef;
+    public String getLoanNumber() {
+        return id != null ? id.getLoanNumber() : null;
+    }
 
     // All custom fields for this loan in this file, aggregated into one JSONB
     @JdbcTypeCode(SqlTypes.JSON)

@@ -3,6 +3,7 @@ package com.example.positionmanagementservice.service;
 import com.example.positionmanagementservice.controller.PositionFileController;
 import com.example.positionmanagementservice.dto.PositionFileMetaDTO;
 import com.example.positionmanagementservice.entity.*;
+import java.time.LocalDate;
 import com.example.positionmanagementservice.repository.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.transaction.Transactional;
@@ -47,7 +48,7 @@ public class PositionFileService {
     );
 
     @Transactional
-    public void handleUpload(String name, LocalDate positionDate, MultipartFile zipFile) throws IOException {
+    public UUID handleUpload(String name, LocalDate positionDate, MultipartFile zipFile) throws IOException {
 
         // Check uniqueness of name + date
         boolean alreadyExists = positionFileRepository
@@ -90,7 +91,7 @@ public class PositionFileService {
             parseLoanCsv(parsedCsvs.get("loan.csv"), positionFile);
 
             // 2. Build loan map
-            Map<String, Loan> loanMap = loanRepository.findAllByPositionFile(positionFile).stream()
+            Map<String, Loan> loanMap = loanRepository.findAllById_PositionFileId(positionFile.getId()).stream()
                     .collect(Collectors.toMap(Loan::getLoanNumber, Function.identity()));
 
             // 3. Remaining files
@@ -109,6 +110,8 @@ public class PositionFileService {
         } catch (Exception ex) {
             throw new RuntimeException("Parsing failed: " + ex.getMessage(), ex);
         }
+        
+        return positionFile.getId();
     }
 
 
@@ -157,8 +160,8 @@ public class PositionFileService {
 
         List<Loan> toSave = new ArrayList<>(records.size());
         for (CSVRecord row : records) {
+            String loanNumber = null;
             Loan loan = new Loan();
-            loan.setPositionFile(pfRef);
 
             Map<String, String> map = row.toMap();
             for (Map.Entry<String, String> entry : map.entrySet()) {
@@ -167,7 +170,7 @@ public class PositionFileService {
 
                 if (STANDARD_LOAN_COLUMNS.contains(column)) {
                     switch (column) {
-                        case "loanNumber" -> loan.setLoanNumber(nz(value).trim());
+                        case "loanNumber" -> loanNumber = nz(value).trim();
                         case "principal" -> loan.setPrincipal(safeDecimal(value));
                         case "interestRate" -> loan.setInterestRate(safeDecimal(value));
                         case "termMonths" -> loan.setTermMonths(parseIntSafe(value));
@@ -178,10 +181,13 @@ public class PositionFileService {
             }
 
             // minimal validation
-            if (isBlank(loan.getLoanNumber())) {
-                // skip bad row (or throw)
+            if (isBlank(loanNumber)) {
                 continue;
             }
+
+            // Set composite key
+            LoanId loanId = new LoanId(fileId, loanNumber);
+            loan.setId(loanId);
 
             toSave.add(loan);
         }
@@ -208,12 +214,13 @@ public class PositionFileService {
             if (loan == null) continue;
 
             PaymentSchedule ps = new PaymentSchedule();
-            ps.setLoanNumber(loanNumber);
-            ps.setPositionFile(loan.getPositionFile()); // parent FK
-            ps.setLoanRef(loan);                        // back-ref
-
+            
             String startDateStr = firstNonBlank(row, "startDate", "start_date");
-            if (isNotBlank(startDateStr)) ps.setStartDate(safeDate(startDateStr));
+            LocalDate startDate = isNotBlank(startDateStr) ? safeDate(startDateStr) : LocalDate.now();
+            
+            // Set composite key
+            PaymentScheduleId psId = new PaymentScheduleId(loan.getPositionFileId(), loanNumber, startDate);
+            ps.setId(psId);
 
             String endDateStr = firstNonBlank(row, "endDate", "end_date");
             if (isNotBlank(endDateStr)) ps.setEndDate(safeDate(endDateStr));
@@ -254,12 +261,13 @@ public class PositionFileService {
             if (loan == null) continue;
 
             RateSchedule rs = new RateSchedule();
-            rs.setLoanNumber(loanNumber);
-            rs.setPositionFile(loan.getPositionFile());
-            rs.setLoanRef(loan);
-
+            
             String effDate = firstNonBlank(row, "effectiveDate", "effective_date");
-            if (isNotBlank(effDate)) rs.setEffectiveDate(safeDate(effDate));
+            LocalDate effectiveDate = isNotBlank(effDate) ? safeDate(effDate) : LocalDate.now();
+            
+            // Set composite key
+            RateScheduleId rsId = new RateScheduleId(loan.getPositionFileId(), loanNumber, effectiveDate);
+            rs.setId(rsId);
 
             String rateStr = firstNonBlank(row, "rate", "interestRate", "interest_rate");
             if (isNotBlank(rateStr)) rs.setRate(safeDecimal(rateStr));
@@ -308,15 +316,15 @@ public class PositionFileService {
             Loan loan = loanMap.get(loanNumber);
             if (loan == null) continue;
 
-            UUID fileId = loan.getPositionFile().getId();
+            UUID fileId = loan.getPositionFileId();
 
             CustomFields cf = customFieldsRepository
-                    .findByPositionFile_IdAndLoanNumber(fileId, loanNumber)
+                    .findById_PositionFileIdAndId_LoanNumber(fileId, loanNumber)
                     .orElseGet(CustomFields::new);
 
-            cf.setLoanNumber(loanNumber);
-            cf.setPositionFile(loan.getPositionFile());
-            cf.setLoanRef(loan);
+            // Set composite key
+            CustomFieldId cfId = new CustomFieldId(fileId, loanNumber);
+            cf.setId(cfId);
             cf.setFields(fields);
 
             toSave.add(cf);
@@ -334,7 +342,7 @@ public class PositionFileService {
     }
 
     public long getCustomFieldsCount(UUID positionFileId) {
-        return customFieldsRepository.countByPositionFile_Id(positionFileId);
+        return customFieldsRepository.countById_PositionFileId(positionFileId);
     }
 
     @Transactional
@@ -346,12 +354,12 @@ public class PositionFileService {
         }
 
         // Delete children first (order matters due to FKs)
-        customFieldsRepository.deleteByPositionFile(file);
-        paymentScheduleRepository.deleteByPositionFile(file);
-        rateScheduleRepository.deleteByPositionFile(file);
+        customFieldsRepository.deleteById_PositionFileId(file.getId());
+        paymentScheduleRepository.deleteById_PositionFileId(file.getId());
+        rateScheduleRepository.deleteById_PositionFileId(file.getId());
 
         // Delete loans
-        loanRepository.deleteByPositionFile(file);
+        loanRepository.deleteById_PositionFileId(file.getId());
 
         // Delete the PositionFile row
         positionFileRepository.delete(file);
@@ -370,32 +378,32 @@ public class PositionFileService {
 
     public long getLoanCount(UUID positionFileId) {
         ensureExists(positionFileId);
-        return loanRepository.countByPositionFile_Id(positionFileId);
+        return loanRepository.countById_PositionFileId(positionFileId);
     }
 
     public long getPaymentScheduleCount(UUID positionFileId) {
         ensureExists(positionFileId);
-        return paymentScheduleRepository.countByPositionFile_Id(positionFileId);
+        return paymentScheduleRepository.countById_PositionFileId(positionFileId);
     }
 
     public long getRateScheduleCount(UUID positionFileId) {
         ensureExists(positionFileId);
-        return rateScheduleRepository.countByPositionFile_Id(positionFileId);
+        return rateScheduleRepository.countById_PositionFileId(positionFileId);
     }
 
     public long getCustomFieldCount(UUID positionFileId) {
         ensureExists(positionFileId);
-        return customFieldsRepository.countByPositionFile_Id(positionFileId);
+        return customFieldsRepository.countById_PositionFileId(positionFileId);
     }
 
     public PositionFileMetaDTO getMetadata(UUID positionFileId) {
         PositionFile pf = positionFileRepository.findById(positionFileId)
                 .orElseThrow(() -> new NoSuchElementException("Position file not found: " + positionFileId));
 
-        long loans = loanRepository.countByPositionFile_Id(positionFileId);
-        long schedules = paymentScheduleRepository.countByPositionFile_Id(positionFileId);
-        long rateRows = rateScheduleRepository.countByPositionFile_Id(positionFileId);
-        long customFields = customFieldsRepository.countByPositionFile_Id(positionFileId);
+        long loans = loanRepository.countById_PositionFileId(positionFileId);
+        long schedules = paymentScheduleRepository.countById_PositionFileId(positionFileId);
+        long rateRows = rateScheduleRepository.countById_PositionFileId(positionFileId);
+        long customFields = customFieldsRepository.countById_PositionFileId(positionFileId);
 
         return new PositionFileMetaDTO(
                 pf.getId(),
@@ -414,9 +422,9 @@ public class PositionFileService {
         if (limit <= 0) throw new IllegalArgumentException("limit must be > 0");
 
         int page = Math.floorDiv((int) offset, Math.max(1, limit));
-        Pageable pageable = PageRequest.of(page, limit, Sort.by("loanNumber").ascending());
+        Pageable pageable = PageRequest.of(page, limit, Sort.by("id.loanNumber").ascending());
 
-        var loanPage = loanRepository.findByPositionFile_Id(positionFileId, pageable);
+        var loanPage = loanRepository.findById_PositionFileId(positionFileId, pageable);
         var loans = loanPage.getContent();
         if (loans.isEmpty()) return List.of();
 
@@ -430,19 +438,19 @@ public class PositionFileService {
 
         // Payment Schedules, grouped by loanNumber
         Map<String, List<PaymentSchedule>> psByLoan = paymentScheduleRepository
-                .findByPositionFile_IdAndLoanNumberIn(positionFileId, loanNumbers)
+                .findById_PositionFileIdAndId_LoanNumberIn(positionFileId, loanNumbers)
                 .stream()
                 .collect(Collectors.groupingBy(PaymentSchedule::getLoanNumber));
 
         // Rate Schedules, grouped by loanNumber
         Map<String, List<RateSchedule>> rsByLoan = rateScheduleRepository
-                .findByPositionFile_IdAndLoanNumberIn(positionFileId, loanNumbers)
+                .findById_PositionFileIdAndId_LoanNumberIn(positionFileId, loanNumbers)
                 .stream()
                 .collect(Collectors.groupingBy(RateSchedule::getLoanNumber));
 
         // Custom Fields (1 row per loanNumber), map by loanNumber
         Map<String, CustomFields> cfByLoan = customFieldsRepository
-                .findByPositionFile_IdAndLoanNumberIn(positionFileId, loanNumbers)
+                .findById_PositionFileIdAndId_LoanNumberIn(positionFileId, loanNumbers)
                 .stream()
                 .collect(Collectors.toMap(CustomFields::getLoanNumber, Function.identity(), (a, b) -> a, LinkedHashMap::new));
 
@@ -451,7 +459,7 @@ public class PositionFileService {
                 .map(loan -> {
                     String loanId = (loan.getLoanNumber() != null && !loan.getLoanNumber().isBlank())
                             ? loan.getLoanNumber()
-                            : loan.getId().toString();
+                            : loan.getId().getLoanNumber();
 
                     Map<String, Object> fields = new LinkedHashMap<>();
                     // loan.csv (standard)

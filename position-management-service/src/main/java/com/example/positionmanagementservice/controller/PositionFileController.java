@@ -30,13 +30,14 @@ public class PositionFileController {
     private final PositionFileService positionFileService;
 
     @PostMapping("/upload")
-    public ResponseEntity<String> uploadPositionFile(
+    public ResponseEntity<PositionFileMetaDTO> uploadPositionFile(
             @RequestParam("name") String name,
             @RequestParam("positionDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate positionDate,
             @RequestParam("file") MultipartFile zipFile
     ) throws IOException {
-        positionFileService.handleUpload(name, positionDate, zipFile);
-        return ResponseEntity.ok("File uploaded and parsed successfully.");
+        UUID positionFileId = positionFileService.handleUpload(name, positionDate, zipFile);
+        PositionFileMetaDTO metadata = positionFileService.getMetadata(positionFileId);
+        return ResponseEntity.ok(metadata);
     }
 
     @GetMapping

@@ -3,6 +3,7 @@ package com.example.assumptionmanagementservice.controller;
 import com.example.assumptionmanagementservice.dto.AssumptionSetDto;
 import com.example.assumptionmanagementservice.entity.AssumptionSet;
 import com.example.assumptionmanagementservice.service.AssumptionService;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
@@ -25,14 +26,14 @@ public class AssumptionController {
     private final AssumptionService assumptionService;
 
     @PostMapping
-    public ResponseEntity<Map<String, UUID>> upload(
+    public ResponseEntity<AssumptionSetDto> upload(
             @RequestParam String name,
             @RequestParam(required = false) String description,
             @RequestParam Map<String, String> keyValues,
             @RequestParam(required = false) Map<String, MultipartFile> files
     ) throws IOException {
-        UUID id = assumptionService.createAssumptionSet(name, description, keyValues, files != null ? files : Map.of());
-        return ResponseEntity.ok(Map.of("id", id));
+        AssumptionSetDto metadata = assumptionService.createAssumptionSetAndReturnDto(name, description, keyValues, files != null ? files : Map.of());
+        return ResponseEntity.ok(metadata);
     }
 
     @GetMapping

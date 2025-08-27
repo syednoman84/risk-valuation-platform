@@ -22,29 +22,25 @@ import java.util.UUID;
 @Entity
 @Table(
         name = "loan",
-        uniqueConstraints = {
-                // Enforce exactly one row per (position_file_id, loan_number)
-                @UniqueConstraint(name = "uq_loan_file_loannumber", columnNames = {"position_file_id", "loan_number"})
-        },
         indexes = {
-                @Index(name = "idx_loan_file_loannumber", columnList = "position_file_id, loan_number"),
                 @Index(name = "idx_loan_loannumber", columnList = "loan_number")
         }
 )
 @Data
 public class Loan {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private UUID id;
+    @EmbeddedId
+    private LoanId id;
 
-    // FK to position_file
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "position_file_id", nullable = false)
-    private PositionFile positionFile;
+    // Helper method to get position file ID
+    public UUID getPositionFileId() {
+        return id != null ? id.getPositionFileId() : null;
+    }
 
-    @Column(name = "loan_number", nullable = false, length = 128)
-    private String loanNumber;
+    // Helper method to get loan number
+    public String getLoanNumber() {
+        return id != null ? id.getLoanNumber() : null;
+    }
 
     @Column(name = "principal")
     private BigDecimal principal;

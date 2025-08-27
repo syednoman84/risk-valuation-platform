@@ -12,6 +12,8 @@ import java.util.UUID;
 
 public interface AssumptionService {
     UUID createAssumptionSet(String name, String description, Map<String, String> keyValues, Map<String, MultipartFile> csvFiles) throws IOException;
+    
+    AssumptionSetDto createAssumptionSetAndReturnDto(String name, String description, Map<String, String> keyValues, Map<String, MultipartFile> csvFiles) throws IOException;
 
     List<AssumptionSetDto> getAllDtos();
 

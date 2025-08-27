@@ -14,11 +14,11 @@ select * from loan_models order by created_at desc;
 -- Position File Queries
 -------------------------------------
 select * from position_file order by uploaded_at desc;
-select * from position_file where id='3560d5aa-1276-4835-a16f-27b3c81e5f74';
-select * from loan where position_file_id='3560d5aa-1276-4835-a16f-27b3c81e5f74';
-select * from payment_schedule where position_file_id='3560d5aa-1276-4835-a16f-27b3c81e5f74';
-select * from rate_schedule where position_file_id='3560d5aa-1276-4835-a16f-27b3c81e5f74';
-select * from custom_fields where position_file_id='3560d5aa-1276-4835-a16f-27b3c81e5f74';
+select * from position_file where id='adbabb35-2dda-4eb9-a59b-aa796841e478';
+select * from loan where position_file_id='adbabb35-2dda-4eb9-a59b-aa796841e478';
+select * from payment_schedule where position_file_id='adbabb35-2dda-4eb9-a59b-aa796841e478';
+select * from rate_schedule where position_file_id='adbabb35-2dda-4eb9-a59b-aa796841e478';
+select * from custom_fields where position_file_id='adbabb35-2dda-4eb9-a59b-aa796841e478';
 
 -------------------------------------
 -- Model Execution Queries
