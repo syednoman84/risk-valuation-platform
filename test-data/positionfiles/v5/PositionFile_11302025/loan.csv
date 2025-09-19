@@ -1,7 +1,0 @@
-loanNumber,principal,interestRate,termMonths,amortizationType,originationDate,loanType,region
-LN001,100000,5.5,360,Fixed,2020-01-01,Home,East
-LN002,50000,4.2,180,Fixed,2021-06-01,Auto,West
-LN003,750000,3.55,360,Fixed,2021-06-01,Auto,West
-LN004,5000,6.89,180,Fixed,2021-06-01,Auto,West
-LN005,90000,9.9,360,Fixed,2021-06-01,Auto,West
-LN006,80000,2.5,180,Fixed,2021-06-01,Auto,West
