@@ -18,8 +18,11 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +36,7 @@ public class ExecutionOrchestratorImpl implements ExecutionOrchestrator {
 
     // NEW: worker to process chunks asynchronously
     private final ChunkExecutionWorker chunkWorker;
+    private final ObjectMapper objectMapper;
 
     @Override
     @Transactional
@@ -129,5 +133,55 @@ public class ExecutionOrchestratorImpl implements ExecutionOrchestrator {
     public ModelExecution get(UUID executionId) {
         return executionRepo.findById(executionId)
                 .orElseThrow(() -> new IllegalArgumentException("Execution not found"));
+    }
+    
+    @Override
+    @Transactional
+    public UUID executeModelWithContext(UUID modelId, String modelVersion, UUID positionFileId, 
+                                       UUID assumptionSetId, Map<String, Object> previousResults, 
+                                       String outputPrefix) {
+        Map<String, Object> optionsMap = new HashMap<>();
+        optionsMap.put("previousResults", previousResults);
+        optionsMap.put("outputPrefix", outputPrefix != null ? outputPrefix : "prev_");
+        
+        CreateExecutionRequest request = new CreateExecutionRequest(
+                modelId, 
+                modelVersion != null ? Integer.parseInt(modelVersion) : null,
+                positionFileId, 
+                assumptionSetId, 
+                null, // chunkSize - use default
+                objectMapper.valueToTree(optionsMap)
+        );
+        
+        ModelExecution execution = start(request);
+        return execution.getId();
+    }
+    
+    @Override
+    @Transactional
+    public ModelExecution executeModelSynchronously(UUID modelId, String modelVersion, UUID positionFileId, 
+                                                   UUID assumptionSetId, Map<String, Object> previousResults, 
+                                                   String outputPrefix) {
+        UUID executionId = executeModelWithContext(modelId, modelVersion, positionFileId, 
+                                                  assumptionSetId, previousResults, outputPrefix);
+        
+        // Wait for completion
+        while (true) {
+            ModelExecution execution = get(executionId);
+            ExecutionStatus status = execution.getStatus();
+            
+            if (status == ExecutionStatus.COMPLETED || 
+                status == ExecutionStatus.FAILED || 
+                status == ExecutionStatus.CANCELED) {
+                return execution;
+            }
+            
+            try {
+                Thread.sleep(500); // Wait 500ms before checking again
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Interrupted while waiting for execution", e);
+            }
+        }
     }
 }

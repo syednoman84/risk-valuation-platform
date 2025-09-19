@@ -24,9 +24,9 @@ select * from custom_fields where position_file_id='adbabb35-2dda-4eb9-a59b-aa79
 -- Model Execution Queries
 -------------------------------------
 select * from model_executions order by created_at desc;
-select * from model_execution_errors where execution_id='5ae653b7-ea68-491b-9105-c17c0eacd674';
-select * from model_execution_chunks where execution_id='5ae653b7-ea68-491b-9105-c17c0eacd674';
-select * from execution_results where execution_id='5ae653b7-ea68-491b-9105-c17c0eacd674';
+select * from model_execution_errors where execution_id='970842c5-f740-476f-9131-04a006694def';
+select * from model_execution_chunks where execution_id='970842c5-f740-476f-9131-04a006694def';
+select * from execution_results where execution_id='970842c5-f740-476f-9131-04a006694def';
 
 -------------------------------------
 -- Drop Create queries

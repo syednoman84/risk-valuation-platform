@@ -1,0 +1,25 @@
+{
+  "name": "Simple Test Chain",
+  "description": "Two-step chain to test basic chaining functionality",
+  "positionFileId": "52f4adf5-6fdc-49b3-a812-845ca1854e0f",
+  "steps": [
+    {
+      "modelId": "91b55ae2-6b7f-4f5a-b5d4-619377c3bea6",
+      "modelVersion": "2",
+      "stepName": "Basic Calculation",
+      "description": "Calculate monthly rate and risk score",
+      "assumptionSetId": "52673c81-611d-4c02-883e-8035540edb27",
+      "outputFieldsToInclude": ["monthlyRate", "riskScore"],
+      "outputPrefix": "step1_"
+    },
+    {
+      "modelId": "da7e8617-b412-4f08-b64f-50ee9dfc912d",
+      "modelVersion": "2",
+      "stepName": "Enhanced Calculation",
+      "description": "Use step1 results to calculate final values",
+      "assumptionSetId": "1833cc4d-cadb-4f7d-bd39-f84f452c6a68",
+      "outputFieldsToInclude": ["adjustedRate", "finalPayment"],
+      "outputPrefix": "final_"
+    }
+  ]
+}

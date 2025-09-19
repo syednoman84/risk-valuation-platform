@@ -1,0 +1,28 @@
+{
+  "name": "Enhanced Calculation Model",
+  "description": "Step 2: Use results from step 1 to calculate final values",
+  "modelDefinition": {
+    "inputs": {
+      "positionFields": ["loanId", "principal"],
+      "assumptionValues": ["multiplier"],
+      "csvTables": []
+    },
+    "derivedFields": [
+      {
+        "name": "adjustedRate",
+        "expression": "final_monthlyRate * assumption.keyLookup.multiplier"
+      },
+      {
+        "name": "finalPayment",
+        "expression": "principal * adjustedRate + final_riskScore"
+      }
+    ],
+    "outputs": [
+      { "name": "loanId", "expression": "loanId" },
+      { "name": "adjustedRate", "expression": "adjustedRate" },
+      { "name": "finalPayment", "expression": "finalPayment" },
+      { "name": "step1_monthlyRate", "expression": "final_monthlyRate" },
+      { "name": "step1_riskScore", "expression": "final_riskScore" }
+    ]
+  }
+}

@@ -92,7 +92,7 @@ public class ChunkExecutionWorker {
                 if (exec.isCancelRequested()) break;
 
                 try {
-                    ObjectNode output = evaluate(modelDef, loan, bundle);
+                    ObjectNode output = evaluate(modelDef, loan, bundle, exec);
                     output.set("positionData", objectMapper.valueToTree(loan.fields()));
 
                     resultRepo.save(ExecutionResult.builder()
@@ -140,7 +140,8 @@ public class ChunkExecutionWorker {
 
     private ObjectNode evaluate(JsonNode modelDef,
                                 PositionServiceClient.LoanRow loan,
-                                AssumptionServiceClient.AssumptionBundle bundle) {
+                                AssumptionServiceClient.AssumptionBundle bundle,
+                                ModelExecution exec) {
         Map<String, Object> ctx = new HashMap<>(loan.fields());
         
         // Create assumption object with keyLookup and tableLookup
@@ -152,6 +153,40 @@ public class ChunkExecutionWorker {
         // Add loanId from the LoanRow record (both loanId and loanNumber for compatibility)
         ctx.put("loanId", loan.loanId());
         ctx.put("loanNumber", loan.loanId());
+        
+        // Add previous results if this is part of a chain execution
+        if (exec.getOptions() != null && exec.getOptions().has("previousResults")) {
+            JsonNode previousResultsNode = exec.getOptions().get("previousResults");
+            String outputPrefix = exec.getOptions().has("outputPrefix") ? 
+                    exec.getOptions().get("outputPrefix").asText() : "prev_";
+            
+            log.info("Processing previous results for loan: {}, outputPrefix: {}", loan.loanId(), outputPrefix);
+            
+            // Add previous results for this loan
+            if (previousResultsNode != null && previousResultsNode.has(loan.loanId())) {
+                JsonNode loanPreviousResults = previousResultsNode.get(loan.loanId());
+                log.info("Found previous results for loan {}: {}", loan.loanId(), loanPreviousResults);
+                
+                if (loanPreviousResults != null && loanPreviousResults.isObject()) {
+                    loanPreviousResults.fields().forEachRemaining(entry -> {
+                        String key = outputPrefix + entry.getKey();
+                        JsonNode value = entry.getValue();
+                        if (value.isNumber()) {
+                            ctx.put(key, value.asDouble());
+                            log.info("Added previous result: {} = {}", key, value.asDouble());
+                        } else if (value.isBoolean()) {
+                            ctx.put(key, value.asBoolean());
+                            log.info("Added previous result: {} = {}", key, value.asBoolean());
+                        } else {
+                            ctx.put(key, value.asText());
+                            log.info("Added previous result: {} = {}", key, value.asText());
+                        }
+                    });
+                }
+            } else {
+                log.warn("No previous results found for loan: {}", loan.loanId());
+            }
+        }
         
         // Flatten customFields to root level for easy access
         Object customFields = loan.fields().get("customFields");
@@ -184,6 +219,13 @@ public class ChunkExecutionWorker {
         log.info("Lookup function in context: {}", ctx.get("lookup") != null);
         log.info("Context keys: {}", ctx.keySet());
         log.info("creditScore value: {}", ctx.get("creditScore"));
+        log.info("cecl_finalECL value: {}", ctx.get("cecl_finalECL"));
+        log.info("cecl_stageMultiplier value: {}", ctx.get("cecl_stageMultiplier"));
+        
+        // Log all context keys that start with 'cecl_'
+        ctx.keySet().stream()
+            .filter(key -> key.startsWith("cecl_"))
+            .forEach(key -> log.info("CECL context variable: {} = {}", key, ctx.get(key)));
 
         ObjectNode derivedBag = objectMapper.createObjectNode();
         ObjectNode outputsBag = objectMapper.createObjectNode();

@@ -11,4 +11,6 @@ import java.util.UUID;
 
 public interface ModelExecutionRepository extends JpaRepository<ModelExecution, UUID> {
     List<ModelExecution> findTop50ByStatusOrderByRequestedAtAsc(ExecutionStatus status);
+    List<ModelExecution> findTop10ByOrderByCreatedAtDesc();
+    List<ModelExecution> findByPositionFileIdOrderByCreatedAtDesc(UUID positionFileId);
 }

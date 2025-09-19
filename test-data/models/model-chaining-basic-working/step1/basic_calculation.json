@@ -1,0 +1,26 @@
+{
+  "name": "Basic Calculation Model",
+  "description": "Step 1: Calculate basic loan metrics",
+  "modelDefinition": {
+    "inputs": {
+      "positionFields": ["loanId", "principal", "interestRate"],
+      "assumptionValues": ["riskFactor"],
+      "csvTables": []
+    },
+    "derivedFields": [
+      {
+        "name": "monthlyRate",
+        "expression": "interestRate / 12"
+      },
+      {
+        "name": "riskScore",
+        "expression": "principal * assumption.keyLookup.riskFactor"
+      }
+    ],
+    "outputs": [
+      { "name": "loanId", "expression": "loanId" },
+      { "name": "monthlyRate", "expression": "monthlyRate" },
+      { "name": "riskScore", "expression": "riskScore" }
+    ]
+  }
+}

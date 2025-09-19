@@ -1,0 +1,1 @@
+riskFactor = 0.02
