@@ -1,0 +1,40 @@
+{
+  "name": "Payment Calculation Model",
+  "description": "Step 3: Calculate final payments using pricing results",
+  "modelDefinition": {
+    "inputs": {
+      "positionFields": ["loanId", "principal", "termMonths"],
+      "assumptionValues": ["servicingFee"],
+      "csvTables": []
+    },
+    "derivedFields": [
+      {
+        "name": "monthlyPayment",
+        "expression": "pricing_monthlyRate > 0 ? (principal * pricing_monthlyRate / (1 - Math.pow(1 + pricing_monthlyRate, -termMonths))) : 0"
+      },
+      {
+        "name": "totalInterest",
+        "expression": "(monthlyPayment * termMonths) - principal"
+      },
+      {
+        "name": "servicingCost",
+        "expression": "principal * assumption.keyLookup.servicingFee"
+      },
+      {
+        "name": "netProfit",
+        "expression": "totalInterest - servicingCost"
+      },
+      {
+        "name": "profitMargin",
+        "expression": "netProfit / principal * 100"
+      }
+    ],
+    "outputs": [
+      { "name": "loanId", "expression": "loanId" },
+      { "name": "monthlyPayment", "expression": "monthlyPayment" },
+      { "name": "totalInterest", "expression": "totalInterest" },
+      { "name": "netProfit", "expression": "netProfit" },
+      { "name": "profitMargin", "expression": "profitMargin" }
+    ]
+  }
+}

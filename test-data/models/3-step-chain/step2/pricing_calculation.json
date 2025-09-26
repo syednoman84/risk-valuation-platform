@@ -1,0 +1,32 @@
+{
+  "name": "Pricing Calculation Model",
+  "description": "Step 2: Calculate risk-adjusted rates using risk assessment results",
+  "modelDefinition": {
+    "inputs": {
+      "positionFields": ["loanId", "interestRate", "principal"],
+      "assumptionValues": ["baseSpread", "riskMultiplier"],
+      "csvTables": []
+    },
+    "derivedFields": [
+      {
+        "name": "riskPremium",
+        "expression": "risk_riskScore * assumption.keyLookup.riskMultiplier / 100"
+      },
+      {
+        "name": "adjustedRate",
+        "expression": "fn.toNumber(interestRate) + fn.toNumber(assumption.keyLookup.baseSpread) + riskPremium"
+      },
+      {
+        "name": "monthlyRate",
+        "expression": "adjustedRate / 12"
+      }
+    ],
+    "outputs": [
+      { "name": "loanId", "expression": "loanId" },
+      { "name": "riskPremium", "expression": "riskPremium" },
+      { "name": "adjustedRate", "expression": "adjustedRate" },
+      { "name": "monthlyRate", "expression": "monthlyRate" },
+      { "name": "risk_riskScore", "expression": "risk_riskScore" }
+    ]
+  }
+}

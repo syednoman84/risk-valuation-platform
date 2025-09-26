@@ -160,12 +160,9 @@ public class ChunkExecutionWorker {
             String outputPrefix = exec.getOptions().has("outputPrefix") ? 
                     exec.getOptions().get("outputPrefix").asText() : "prev_";
             
-            log.info("Processing previous results for loan: {}, outputPrefix: {}", loan.loanId(), outputPrefix);
-            
-            // Add previous results for this loan
             if (previousResultsNode != null && previousResultsNode.has(loan.loanId())) {
                 JsonNode loanPreviousResults = previousResultsNode.get(loan.loanId());
-                log.info("Found previous results for loan {}: {}", loan.loanId(), loanPreviousResults);
+                log.info("  📥 Loading previous results for loan {} with prefix '{}'", loan.loanId(), outputPrefix);
                 
                 if (loanPreviousResults != null && loanPreviousResults.isObject()) {
                     loanPreviousResults.fields().forEachRemaining(entry -> {
@@ -173,18 +170,14 @@ public class ChunkExecutionWorker {
                         JsonNode value = entry.getValue();
                         if (value.isNumber()) {
                             ctx.put(key, value.asDouble());
-                            log.info("Added previous result: {} = {}", key, value.asDouble());
+                            log.info("    ✓ {} = {}", key, value.asDouble());
                         } else if (value.isBoolean()) {
                             ctx.put(key, value.asBoolean());
-                            log.info("Added previous result: {} = {}", key, value.asBoolean());
                         } else {
                             ctx.put(key, value.asText());
-                            log.info("Added previous result: {} = {}", key, value.asText());
                         }
                     });
                 }
-            } else {
-                log.warn("No previous results found for loan: {}", loan.loanId());
             }
         }
         
@@ -213,19 +206,7 @@ public class ChunkExecutionWorker {
             }
         }
         
-        log.info("Processing derived fields for loan: {}", loan.loanId());
-        log.info("Available loan fields: {}", loan.fields().keySet());
-        log.info("Assumption bundle tables: {}", bundle.tables().keySet());
-        log.info("Lookup function in context: {}", ctx.get("lookup") != null);
-        log.info("Context keys: {}", ctx.keySet());
-        log.info("creditScore value: {}", ctx.get("creditScore"));
-        log.info("cecl_finalECL value: {}", ctx.get("cecl_finalECL"));
-        log.info("cecl_stageMultiplier value: {}", ctx.get("cecl_stageMultiplier"));
-        
-        // Log all context keys that start with 'cecl_'
-        ctx.keySet().stream()
-            .filter(key -> key.startsWith("cecl_"))
-            .forEach(key -> log.info("CECL context variable: {} = {}", key, ctx.get(key)));
+
 
         ObjectNode derivedBag = objectMapper.createObjectNode();
         ObjectNode outputsBag = objectMapper.createObjectNode();
@@ -235,7 +216,7 @@ public class ChunkExecutionWorker {
         if (!derived.isArray()) {
             derived = modelDef.path("derivedFields");
         }
-        log.info("Found derived fields: {}", derived.isArray() ? derived.size() : "none");
+        log.info("  🔄 Processing {} derived fields for loan {}", derived.isArray() ? derived.size() : 0, loan.loanId());
         if (derived.isArray()) {
             for (JsonNode d : derived) {
                 String name = d.path("name").asText();
@@ -243,12 +224,8 @@ public class ChunkExecutionWorker {
                 if (expr.isEmpty()) {
                     expr = d.path("expression").asText();
                 }
-                log.info("Processing derived field: {} = {}", name, expr);
-                
-
-                
                 Object val = formulaEngine.evaluate(expr, ctx);
-                log.info("Derived field {} evaluated to: {}", name, val);
+                log.info("    ✓ {} = {} (from: {})", name, val, expr);
                 derivedBag.set(name, toJson(val));
                 ctx.put(name, val);
             }
@@ -329,7 +306,11 @@ public class ChunkExecutionWorker {
             exec.setStatus(ExecutionStatus.COMPLETED);
         }
         executionRepo.save(exec);
+        
+
     }
+    
+
 
     private void bumpExecCounters(UUID executionId, int processed, int succeeded, int failed) {
         int attempts = 0;

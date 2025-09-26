@@ -1,0 +1,2 @@
+basePD = 0.03
+baseLGD = 0.45

@@ -1,0 +1,2 @@
+servicingFee = 0.005
+targetMargin = 0.12

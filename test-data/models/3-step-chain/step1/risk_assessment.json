@@ -1,0 +1,31 @@
+{
+  "name": "Risk Assessment Model",
+  "description": "Step 1: Calculate PD, LGD and base risk score",
+  "modelDefinition": {
+    "inputs": {
+      "positionFields": ["loanId", "creditScore", "ltvRatio", "principal"],
+      "assumptionValues": ["basePD", "baseLGD"],
+      "csvTables": []
+    },
+    "derivedFields": [
+      {
+        "name": "adjustedPD",
+        "expression": "assumption.keyLookup.basePD * (creditScore < 650 ? 1.5 : creditScore < 750 ? 1.0 : 0.8)"
+      },
+      {
+        "name": "adjustedLGD",
+        "expression": "assumption.keyLookup.baseLGD * (ltvRatio > 0.8 ? 1.2 : 1.0)"
+      },
+      {
+        "name": "riskScore",
+        "expression": "adjustedPD * adjustedLGD * 100"
+      }
+    ],
+    "outputs": [
+      { "name": "loanId", "expression": "loanId" },
+      { "name": "adjustedPD", "expression": "adjustedPD" },
+      { "name": "adjustedLGD", "expression": "adjustedLGD" },
+      { "name": "riskScore", "expression": "riskScore" }
+    ]
+  }
+}
