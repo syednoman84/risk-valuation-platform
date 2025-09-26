@@ -10,7 +10,7 @@ curl --location 'http://localhost:8081/api/assumptions' \
 curl --location 'http://localhost:8080/api/positions/upload' \
 --form 'name="V3"' \
 --form 'positionDate="2025-11-30"' \
---form 'file=@"/Users/NomanAhmed/Documents/Noman/code/github/risk-valuation-platform/test-data/positionfiles/v3/PositionFile_11302025/PositionFile_11302025.zip"'
+--form 'file=@"/Users/NomanAhme                               d/Documents/Noman/code/github/risk-valuation-platform/test-data/positionfiles/v3/PositionFile_11302025/PositionFile_11302025.zip"'
 
 # Add Model
 curl --location 'http://localhost:8082/api/models' \
