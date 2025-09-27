@@ -23,10 +23,11 @@ select * from rvp_position_db.custom_fields where position_file_id='adbabb35-2dd
 -------------------------------------
 -- Model Execution Queries
 -------------------------------------
-select * from model_executions order by created_at desc;
+select * from model_executions order by created_at desc; --23
 select * from model_execution_errors where execution_id='970842c5-f740-476f-9131-04a006694def';
 select * from model_execution_chunks where execution_id='970842c5-f740-476f-9131-04a006694def';
-select * from execution_results where execution_id='a9d41676-c2c7-49a3-af5f-dd91e6a64980';
+select * from execution_results where execution_id='7a93bc84-f410-4001-b9e8-299bcf16bfe7';
+select * from execution_results order by created_at desc; --35
 
 -------------------------------------
 -- Drop Create queries

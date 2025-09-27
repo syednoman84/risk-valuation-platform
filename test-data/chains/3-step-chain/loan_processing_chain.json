@@ -1,32 +1,32 @@
 {
-  "name": "Complete Loan Processing Chain",
+  "name": "Complete Loan Processing 3-Step Chain Attempt 7",
   "description": "3-step chain: Risk Assessment to Pricing to Payment Calculation",
-  "positionFileId": "52f4adf5-6fdc-49b3-a812-845ca1854e0f",
+  "positionFileId": "{{positionId}}",
   "steps": [
     {
-      "modelId": "6be054d9-4d58-4407-907a-f58db70413dc",
+      "modelId": "{{modelId-step1}}",
       "modelVersion": "1",
       "stepName": "Risk Assessment",
       "description": "Calculate PD, LGD and risk scores",
-      "assumptionSetId": "32775fea-1103-476d-8f18-bff9a6a1c9e8",
+      "assumptionSetId": "{{assumptionSetId-step1}}",
       "outputFieldsToInclude": ["adjustedPD", "adjustedLGD", "riskScore"],
       "outputPrefix": "risk_"
     },
     {
-      "modelId": "3f1890a3-b6a6-4749-bc1c-206c8da09570",
+      "modelId": "{{modelId-step2}}",
       "modelVersion": "1",
       "stepName": "Pricing Calculation",
       "description": "Calculate risk-adjusted rates and premiums",
-      "assumptionSetId": "114dfbc7-6fed-4100-9446-390a8c01ca5d",
+      "assumptionSetId": "{{assumptionSetId-step2}}",
       "outputFieldsToInclude": ["riskPremium", "adjustedRate", "monthlyRate"],
       "outputPrefix": "pricing_"
     },
     {
-      "modelId": "d5bf6ed5-6f5f-4f40-a49c-857aca61fc9a",
+      "modelId": "{{modelId-step3}}",
       "modelVersion": "1",
       "stepName": "Payment Calculation",
       "description": "Calculate final payments and profitability",
-      "assumptionSetId": "be8056cf-7dcf-4207-be3c-3a90bb5050b0",
+      "assumptionSetId": "{{assumptionSetId-step3}}",
       "outputFieldsToInclude": ["monthlyPayment", "totalInterest", "netProfit", "profitMargin"],
       "outputPrefix": "final_"
     }

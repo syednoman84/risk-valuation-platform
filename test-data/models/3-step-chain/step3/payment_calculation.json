@@ -1,5 +1,5 @@
 {
-  "name": "Payment Calculation Model",
+  "name": "Payment Calculation Model Step 3",
   "description": "Step 3: Calculate final payments using pricing results",
   "modelDefinition": {
     "inputs": {
